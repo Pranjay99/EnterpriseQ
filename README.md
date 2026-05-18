@@ -15,6 +15,9 @@ An AI-powered enterprise data assistant that lets you query structured data, ana
 - **Multi-Document Analysis** — Synthesize, compare, or query across up to 10 documents at once
 - **Interactive Charts** — Plotly visualizations generated automatically from your data
 
+  <img width="1906" height="948" alt="Screenshot 2026-05-18 155027" src="https://github.com/user-attachments/assets/303887d9-9e74-40ab-9ef5-0b3c4154eaa8" />
+
+
 ## Tech Stack
 
 | Layer | Technology |
