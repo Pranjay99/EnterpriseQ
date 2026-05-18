@@ -2,6 +2,9 @@
 
 An AI-powered enterprise data assistant that lets you query structured data, analyze documents, and get intelligent answers through a natural language interface.
 
+<img width="1901" height="946" alt="Screenshot 2026-05-18 154951" src="https://github.com/user-attachments/assets/f240d68c-2dff-49bd-84d4-75eb9bb4df93" />
+
+
 ## Features
 
 - **Text-to-SQL** — Ask questions about CSV, Excel, or JSON files and get SQL-powered answers
