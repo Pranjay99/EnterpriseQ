@@ -120,6 +120,5 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | DELETE | `/api/catalog/{doc_id}` | Delete a document |
 | POST | `/api/multi-doc/query` | Query multiple documents |
 
-## License
-
-MIT
+## 🔗 Portfolio
+[![Portfolio](https://img.shields.io/badge/Portfolio-Pranjay%20Seksaria-blue?style=for-the-badge&logo=google-chrome&logoColor=white)](https://pranjay-portfolio.netlify.app/)
