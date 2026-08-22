@@ -200,7 +200,8 @@
     Enterprise Q is a classic three-tier application with an <strong>agentic middle layer</strong>:
     a Next.js frontend, a FastAPI backend that routes every request through the right agent, and a
     storage layer combining an in-memory session store, SQLite, and a persistent ChromaDB vector store.
-    All intelligence is provided by <strong>Google Gemini 2.5 Flash</strong> via LangChain.
+    Answer generation is provided by <strong>Google Gemini 2.5 Flash</strong> via LangChain;
+    embeddings are computed <strong>locally on the server</strong> with sentence-transformers.
   </p>
 
   <div class="diagram-wrap">
@@ -307,13 +308,13 @@
 
     <!-- ── LLM TIER ── -->
     <rect x="530" y="610" width="490" height="150" rx="14" fill="#fce9ec" stroke="#b23a48" stroke-width="1.5"/>
-    <text x="550" y="638" font-size="15" font-weight="700" fill="#8f2e3a">GOOGLE GEMINI (free tier)</text>
+    <text x="550" y="638" font-size="15" font-weight="700" fill="#8f2e3a">AI MODELS (Gemini + local)</text>
     <rect x="555" y="652" width="215" height="44" rx="8" fill="#fff" stroke="#b23a48"/>
     <text x="662" y="670" font-size="12" font-weight="600" text-anchor="middle">gemini-2.5-flash</text>
     <text x="662" y="686" font-size="10.5" text-anchor="middle" fill="#4b5568">reasoning · SQL generation · answers</text>
     <rect x="785" y="652" width="215" height="44" rx="8" fill="#fff" stroke="#b23a48"/>
-    <text x="892" y="670" font-size="12" font-weight="600" text-anchor="middle">gemini-embedding-001</text>
-    <text x="892" y="686" font-size="10.5" text-anchor="middle" fill="#4b5568">text embeddings for vector search</text>
+    <text x="892" y="670" font-size="12" font-weight="600" text-anchor="middle">all-MiniLM-L6-v2 (local)</text>
+    <text x="892" y="686" font-size="10.5" text-anchor="middle" fill="#4b5568">CPU embeddings — no API quota</text>
     <rect x="555" y="706" width="445" height="44" rx="8" fill="#fff" stroke="#b23a48"/>
     <text x="777" y="724" font-size="12" font-weight="600" text-anchor="middle">Plotly chart generator</text>
     <text x="777" y="740" font-size="10.5" text-anchor="middle" fill="#4b5568">turns agent chart hints ("Chart: bar on X vs Y") into interactive JSON figures</text>
@@ -360,7 +361,7 @@
   <ol class="flow-steps">
     <li>The upload router validates the file type (<code>.csv .xlsx .xls .json .pdf</code>) and enforces the size cap (default 20&nbsp;MB), then writes the file to a temp location.</li>
     <li><strong>Tabular files</strong> (CSV / Excel / JSON) are parsed into a pandas <strong>DataFrame</strong> and stored in the in-memory session store; the DataFrame is also mirrored into a <strong>sandboxed in-memory SQLite database</strong> so the SQL Agent can query it.</li>
-    <li><strong>PDF files</strong> are split into text chunks by the PDF loader, embedded with <code>gemini-embedding-001</code>, and ingested into a <strong>session-scoped ChromaDB collection</strong> for immediate chat.</li>
+    <li><strong>PDF files</strong> are split into text chunks by the PDF loader, embedded locally with <code>all-MiniLM-L6-v2</code> (sentence-transformers, runs on the server's CPU — no API quota), and ingested into a <strong>session-scoped ChromaDB collection</strong> for immediate chat.</li>
     <li>PDFs are <em>also</em> ingested into a <strong>permanent ChromaDB collection</strong>, and Gemini auto-generates a <strong>summary, category, and tags</strong> which are saved to the SQLite catalog (<code>catalog.db</code>) — making the document searchable and reusable forever.</li>
   </ol>
 
@@ -442,7 +443,7 @@
     <tr><td rowspan="2"><strong>Backend</strong></td><td>FastAPI + Uvicorn</td><td>REST API, CORS enforcement, Swagger docs at <code>/docs</code>; blocking LLM calls run in worker threads.</td></tr>
     <tr><td>Pydantic</td><td>Request/response schema validation (<code>ChatRequest</code>, <code>ChatResponse</code>, …).</td></tr>
     <tr><td rowspan="3"><strong>AI / LLM</strong></td><td>Google Gemini 2.5 Flash</td><td>All generation: SQL synthesis, data analysis, RAG answers, reasoning, document summarization. Free tier.</td></tr>
-    <tr><td>Gemini Embedding 001</td><td>Text embeddings for document chunks and query similarity search.</td></tr>
+    <tr><td>sentence-transformers (<code>all-MiniLM-L6-v2</code>, local)</td><td>Text embeddings computed on the server's CPU — no API quota; model (~80 MB) cached after first download.</td></tr>
     <tr><td>LangChain (core, community, google-genai, classic)</td><td>LLM wiring, conversation chains, tool-calling agent, retriever abstractions, SQLDatabase utility.</td></tr>
     <tr><td rowspan="3"><strong>Data &amp; storage</strong></td><td>ChromaDB (persistent client)</td><td>Vector store — session-scoped and permanent collections under <code>chroma_data/</code>.</td></tr>
     <tr><td>SQLite + SQLAlchemy</td><td><code>catalog.db</code> for the document catalog; separate in-memory SQLite per session for sandboxed Text-to-SQL.</td></tr>

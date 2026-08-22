@@ -25,7 +25,7 @@ An AI-powered enterprise data assistant that lets you query structured data, ana
 | Frontend | Next.js 14, TypeScript, Tailwind CSS, shadcn/ui |
 | Backend | FastAPI, Uvicorn |
 | LLM | Google Gemini 2.5 Flash (free tier) |
-| Embeddings | Google Gemini Embedding 001 |
+| Embeddings | sentence-transformers (all-MiniLM-L6-v2, local CPU) |
 | Vector DB | ChromaDB |
 | Data | Pandas, SQLAlchemy, SQLite |
 | Visualization | Plotly |

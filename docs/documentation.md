@@ -27,7 +27,7 @@ A user uploads a file and asks a question — *"What is the average attrition ra
 
 ## 2. Architecture
 
-Three-tier application with an **agentic middle layer**: Next.js frontend → FastAPI backend that routes every request through the right agent → storage layer (in-memory session store, SQLite, persistent ChromaDB). All intelligence comes from **Google Gemini 2.5 Flash** via LangChain.
+Three-tier application with an **agentic middle layer**: Next.js frontend → FastAPI backend that routes every request through the right agent → storage layer (in-memory session store, SQLite, persistent ChromaDB). Answer generation comes from **Google Gemini 2.5 Flash** via LangChain; embeddings are computed locally with sentence-transformers.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -63,11 +63,11 @@ Three-tier application with an **agentic middle layer**: Next.js frontend → Fa
 └──────────────┬──────────────────────────────────────┬───────────────────┘
                │                                      │
 ┌──────────────▼──────────────────┐   ┌───────────────▼─────────────────┐
-│  STORAGE & DATA                 │   │  GOOGLE GEMINI (free tier)      │
+│  STORAGE & DATA                 │   │  AI MODELS (Gemini + local)     │
 │  · ChromaDB (chroma_data/)      │   │  · gemini-2.5-flash             │
 │  · SQLite catalog.db (SQLAlchemy)│   │    (reasoning · SQL · answers)  │
-│  · In-memory DataFrames/session │   │  · gemini-embedding-001         │
-│  · In-memory SQLite (sandboxed  │   │    (vector embeddings)          │
+│  · In-memory DataFrames/session │   │  · all-MiniLM-L6-v2 (local)     │
+│  · In-memory SQLite (sandboxed  │   │    (CPU embeddings, no quota)   │
 │    per-session Text-to-SQL DB)  │   │  · Plotly chart generator       │
 └─────────────────────────────────┘   └─────────────────────────────────┘
 ```
@@ -90,7 +90,7 @@ Three-tier application with an **agentic middle layer**: Next.js frontend → Fa
 
 1. Upload router validates the file type (`.csv .xlsx .xls .json .pdf`) and enforces the size cap (default 20 MB via `MAX_UPLOAD_MB`), then writes to a temp file.
 2. **Tabular files** (CSV / Excel / JSON) → parsed into a pandas **DataFrame** (in-memory session store) and mirrored into a **sandboxed in-memory SQLite DB** for the SQL Agent.
-3. **PDFs** → split into text chunks, embedded with `gemini-embedding-001`, ingested into a **session-scoped ChromaDB collection** for immediate chat.
+3. **PDFs** → split into text chunks, embedded locally with `all-MiniLM-L6-v2` (sentence-transformers, server CPU — no API quota), ingested into a **session-scoped ChromaDB collection** for immediate chat.
 4. PDFs are *also* ingested into a **permanent ChromaDB collection**; Gemini auto-generates a **summary, category, and tags**, saved to `catalog.db` — making the document searchable and reusable forever.
 
 ### Flow 2 — Chat Query Routing (`POST /api/chat`, see `backend/routers/chat.py`)
@@ -141,7 +141,7 @@ Priority order:
 | Backend | FastAPI + Uvicorn | REST API, CORS, Swagger at `/docs`; blocking LLM calls run in worker threads (plain `def` endpoints). |
 | Backend | Pydantic | Request/response schemas (`ChatRequest`, `ChatResponse`, …). |
 | AI / LLM | Google Gemini 2.5 Flash | All generation: SQL synthesis, analysis, RAG answers, reasoning, summarization. Free tier. |
-| AI / LLM | Gemini Embedding 001 | Text embeddings for chunks and query similarity. |
+| AI / LLM | sentence-transformers (`all-MiniLM-L6-v2`, local) | Text embeddings on the server's CPU — no API quota; ~80 MB model cached after first download. |
 | AI / LLM | LangChain (core, community, google-genai, classic) | LLM wiring, conversation chains, tool-calling agent, retrievers, SQLDatabase utility. |
 | Storage | ChromaDB (persistent client) | Vector store — session + permanent collections under `chroma_data/`. |
 | Storage | SQLite + SQLAlchemy | `catalog.db` for the document catalog; in-memory SQLite per session for sandboxed Text-to-SQL. |

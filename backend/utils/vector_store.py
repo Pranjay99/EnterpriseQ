@@ -2,7 +2,8 @@
 vector_store.py — ChromaDB vector store manager for RAG document retrieval.
 
 Each session gets its own Chroma collection so documents are isolated.
-Uses Google Generative AI embeddings (free tier) to match the LLM provider.
+Uses a local sentence-transformers embedding model — runs on the server's CPU,
+consumes no API quota, and works offline after the first model download.
 """
 
 import os
@@ -10,7 +11,7 @@ from dotenv import load_dotenv
 
 import chromadb
 from chromadb.config import Settings
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 
 load_dotenv()
@@ -19,10 +20,12 @@ load_dotenv()
 _CHROMA_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "chroma_data")
 _chroma_client = chromadb.PersistentClient(path=os.path.abspath(_CHROMA_DIR))
 
-# Google embedding model (free tier, same API key as Gemini)
-_embeddings = GoogleGenerativeAIEmbeddings(
-    model="models/gemini-embedding-001",
-    google_api_key=os.getenv("GOOGLE_API_KEY"),
+# Local embedding model (~80 MB, downloaded once to ~/.cache/huggingface).
+# Override via EMBEDDING_MODEL in .env. Vectors are 384-dim — collections
+# created with the old Gemini embeddings (768-dim) are incompatible and
+# must be re-ingested.
+_embeddings = HuggingFaceEmbeddings(
+    model_name=os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"),
 )
 
 # In-memory cache: session_id -> Chroma vectorstore wrapper
