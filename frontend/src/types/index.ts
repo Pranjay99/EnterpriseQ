@@ -11,7 +11,7 @@ export interface Message {
 export interface UploadResponse {
   filename: string
   rows?: number
-  columns?: number
+  columns?: string[]
   chunks?: number
   file_type: 'data' | 'document'
   doc_id?: number
@@ -30,6 +30,17 @@ export interface CatalogItem {
   query_count: number
   is_pinned: boolean
   vector_collection: string
+}
+
+export interface CatalogListResponse {
+  documents: CatalogItem[]
+  total: number
+}
+
+export interface MultiDocResponse {
+  answer: string
+  sources: string[]
+  mode: string
 }
 
 export interface CatalogStats {

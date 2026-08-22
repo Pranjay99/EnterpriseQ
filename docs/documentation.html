@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enterprise Q — Project Documentation</title>
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --surface: #ffffff;
+    --ink: #1a2233;
+    --ink-soft: #4b5568;
+    --accent: #2d5bd1;
+    --accent-soft: #e8eefc;
+    --green: #1f8a5c;
+    --green-soft: #e6f4ec;
+    --amber: #b0691a;
+    --amber-soft: #fdf1e0;
+    --purple: #6b46c1;
+    --purple-soft: #f0eafa;
+    --red: #b23a48;
+    --border: #dde2ea;
+    --mono: "Cascadia Code", Consolas, "SF Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.65;
+  }
+  header.hero {
+    background: linear-gradient(135deg, #16213e 0%, #1f3a6e 60%, #2d5bd1 100%);
+    color: #fff;
+    padding: 56px 24px 48px;
+    text-align: center;
+  }
+  header.hero h1 { margin: 0 0 8px; font-size: 2.4rem; letter-spacing: -0.5px; }
+  header.hero p.tagline { margin: 0 auto; max-width: 720px; font-size: 1.15rem; opacity: 0.9; }
+  header.hero .badges { margin-top: 20px; }
+  header.hero .badge {
+    display: inline-block; margin: 4px; padding: 4px 14px;
+    border: 1px solid rgba(255,255,255,0.35); border-radius: 999px;
+    font-size: 0.82rem; background: rgba(255,255,255,0.08);
+  }
+  nav.toc {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 12px 24px; text-align: center; position: sticky; top: 0; z-index: 10;
+  }
+  nav.toc a {
+    color: var(--accent); text-decoration: none; margin: 0 14px;
+    font-size: 0.92rem; font-weight: 600;
+  }
+  nav.toc a:hover { text-decoration: underline; }
+  main { max-width: 1080px; margin: 0 auto; padding: 40px 24px 80px; }
+  section { margin-bottom: 56px; }
+  h2 {
+    font-size: 1.6rem; margin: 0 0 6px; padding-bottom: 8px;
+    border-bottom: 3px solid var(--accent); display: inline-block;
+  }
+  h3 { font-size: 1.15rem; margin: 28px 0 8px; color: var(--ink); }
+  p { color: var(--ink-soft); margin: 10px 0; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 22px 26px; margin-top: 18px;
+    box-shadow: 0 1px 3px rgba(20,30,60,0.05);
+  }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 18px; }
+  .feature { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
+  .feature h4 { margin: 0 0 6px; font-size: 1rem; }
+  .feature p { margin: 0; font-size: 0.9rem; }
+  table {
+    width: 100%; border-collapse: collapse; margin-top: 14px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden; font-size: 0.92rem;
+  }
+  th { background: #eef1f6; text-align: left; padding: 10px 14px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); }
+  td { padding: 10px 14px; border-top: 1px solid var(--border); vertical-align: top; }
+  code, .mono {
+    font-family: var(--mono); font-size: 0.86em;
+    background: #eef1f6; padding: 2px 6px; border-radius: 4px; color: #21365e;
+  }
+  pre {
+    background: #16213e; color: #dce6f7; padding: 18px 20px;
+    border-radius: 10px; overflow-x: auto; font-family: var(--mono);
+    font-size: 0.85rem; line-height: 1.55;
+  }
+  pre code { background: none; color: inherit; padding: 0; }
+  .flow-steps { counter-reset: step; list-style: none; padding: 0; margin: 14px 0 0; }
+  .flow-steps li {
+    counter-increment: step; position: relative;
+    padding: 10px 14px 10px 52px; margin-bottom: 8px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    color: var(--ink-soft); font-size: 0.94rem;
+  }
+  .flow-steps li::before {
+    content: counter(step);
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--accent); color: #fff; font-weight: 700; font-size: 0.85rem;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .agent-card { border-left: 5px solid var(--accent); }
+  .agent-card.orch  { border-left-color: var(--amber); }
+  .agent-card.sql   { border-left-color: var(--green); }
+  .agent-card.rag   { border-left-color: var(--purple); }
+  .agent-card.multi { border-left-color: var(--red); }
+  .pill {
+    display: inline-block; font-size: 0.74rem; font-weight: 700;
+    padding: 2px 10px; border-radius: 999px; margin-left: 8px; vertical-align: middle;
+  }
+  .pill.blue   { background: var(--accent-soft); color: var(--accent); }
+  .pill.green  { background: var(--green-soft); color: var(--green); }
+  .pill.amber  { background: var(--amber-soft); color: var(--amber); }
+  .pill.purple { background: var(--purple-soft); color: var(--purple); }
+  .diagram-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-top: 18px; }
+  svg text { font-family: "Segoe UI", system-ui, sans-serif; }
+  footer { text-align: center; padding: 26px; color: var(--ink-soft); font-size: 0.85rem; border-top: 1px solid var(--border); background: var(--surface); }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>Enterprise Q</h1>
+  <p class="tagline">An AI-powered enterprise data assistant — ask questions in plain English over your spreadsheets, databases, and documents, and get grounded answers with interactive charts.</p>
+  <div class="badges">
+    <span class="badge">FastAPI</span>
+    <span class="badge">Next.js 14</span>
+    <span class="badge">Google Gemini 2.5 Flash</span>
+    <span class="badge">LangChain</span>
+    <span class="badge">ChromaDB</span>
+    <span class="badge">Plotly</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <a href="#idea">The Idea</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#dataflow">Data Flow</a>
+  <a href="#agents">The Agents</a>
+  <a href="#tools">Tools &amp; Tech</a>
+  <a href="#api">API Reference</a>
+</nav>
+
+<main>
+
+<!-- ══════════════════════ IDEA ══════════════════════ -->
+<section id="idea">
+  <h2>💡 The Idea — What Enterprise Q Solves</h2>
+  <div class="card">
+    <p>
+      In most organizations, valuable knowledge is scattered across <strong>CSV exports, Excel workbooks,
+      JSON dumps, and PDF reports</strong>. Getting answers out of them requires either technical skills
+      (SQL, pandas, BI tools) or waiting on an analyst. Enterprise Q removes that barrier: it is a
+      <strong>unified natural-language interface over structured and unstructured enterprise data</strong>.
+    </p>
+    <p>
+      A user simply uploads a file and asks a question — <em>"What is the average attrition rate per
+      department?"</em> or <em>"Summarize the risks section of this contract"</em>. Behind the scenes,
+      a set of specialized LLM agents figures out <strong>how</strong> to answer: generating and safely
+      executing SQL, analyzing a DataFrame, retrieving relevant document passages (RAG), performing math,
+      or synthesizing insight across up to 10 documents at once.
+    </p>
+  </div>
+
+  <h3>Problems it addresses</h3>
+  <div class="grid">
+    <div class="feature">
+      <h4>🔍 Data access bottleneck</h4>
+      <p>Non-technical users can query tabular data without knowing SQL or pandas — the Text-to-SQL and DataFrame agents translate plain English into executable analysis.</p>
+    </div>
+    <div class="feature">
+      <h4>📄 Buried document knowledge</h4>
+      <p>PDFs are chunked, embedded, and stored in a vector database, so answers are <em>grounded</em> in the actual document content with cited sources (RAG) — not hallucinated.</p>
+    </div>
+    <div class="feature">
+      <h4>🗂️ No document memory</h4>
+      <p>A permanent <strong>Document Catalog</strong> auto-generates summaries, categories, and tags for every uploaded PDF, tracks usage stats, and lets you pin and revisit documents anytime.</p>
+    </div>
+    <div class="feature">
+      <h4>🔀 Cross-document analysis</h4>
+      <p>The Multi-Doc agent can <strong>synthesize</strong>, <strong>compare</strong>, or answer <strong>per-document</strong> across many files in one query — work that normally takes hours of manual reading.</p>
+    </div>
+    <div class="feature">
+      <h4>📊 Insight, not just answers</h4>
+      <p>Agents emit chart hints that are turned into interactive Plotly visualizations automatically — every numeric answer can come with a graph.</p>
+    </div>
+    <div class="feature">
+      <h4>💸 Zero-cost operation</h4>
+      <p>Built entirely on the Google Gemini free tier, with a zero-LLM-cost heuristic router and safe local tool execution (calculator, unit converter) to conserve API quota.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════ ARCHITECTURE ══════════════════════ -->
+<section id="architecture">
+  <h2>🏗️ Architecture</h2>
+  <p>
+    Enterprise Q is a classic three-tier application with an <strong>agentic middle layer</strong>:
+    a Next.js frontend, a FastAPI backend that routes every request through the right agent, and a
+    storage layer combining an in-memory session store, SQLite, and a persistent ChromaDB vector store.
+    All intelligence is provided by <strong>Google Gemini 2.5 Flash</strong> via LangChain.
+  </p>
+
+  <div class="diagram-wrap">
+  <svg viewBox="0 0 1040 780" width="100%" style="min-width: 900px;">
+    <defs>
+      <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+        <path d="M0,0 L10,4 L0,8 z" fill="#4b5568"/>
+      </marker>
+      <marker id="arrowB" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+        <path d="M0,0 L10,4 L0,8 z" fill="#2d5bd1"/>
+      </marker>
+    </defs>
+
+    <!-- ── FRONTEND TIER ── -->
+    <rect x="20" y="20" width="1000" height="110" rx="14" fill="#e8eefc" stroke="#2d5bd1" stroke-width="1.5"/>
+    <text x="40" y="48" font-size="15" font-weight="700" fill="#1f3a6e">FRONTEND — Next.js 14 · TypeScript · Tailwind CSS · shadcn/ui  (localhost:3000)</text>
+    <rect x="60"  y="62" width="280" height="52" rx="9" fill="#fff" stroke="#2d5bd1"/>
+    <text x="200" y="84" font-size="13" font-weight="600" text-anchor="middle" fill="#1a2233">💬 Chat Page</text>
+    <text x="200" y="102" font-size="11" text-anchor="middle" fill="#4b5568">upload files · ask questions · view charts</text>
+    <rect x="380" y="62" width="280" height="52" rx="9" fill="#fff" stroke="#2d5bd1"/>
+    <text x="520" y="84" font-size="13" font-weight="600" text-anchor="middle" fill="#1a2233">🗂️ Catalog Page</text>
+    <text x="520" y="102" font-size="11" text-anchor="middle" fill="#4b5568">browse · pin · filter · chat with any PDF</text>
+    <rect x="700" y="62" width="280" height="52" rx="9" fill="#fff" stroke="#2d5bd1"/>
+    <text x="840" y="84" font-size="13" font-weight="600" text-anchor="middle" fill="#1a2233">🔀 Multi-Doc Page</text>
+    <text x="840" y="102" font-size="11" text-anchor="middle" fill="#4b5568">synthesize · compare · per-doc answers</text>
+
+    <!-- REST arrow -->
+    <line x1="520" y1="130" x2="520" y2="176" stroke="#2d5bd1" stroke-width="2.5" marker-end="url(#arrowB)"/>
+    <text x="535" y="158" font-size="12" fill="#2d5bd1" font-weight="600">REST / JSON  (CORS-guarded)</text>
+
+    <!-- ── API TIER ── -->
+    <rect x="20" y="180" width="1000" height="120" rx="14" fill="#fdf6ec" stroke="#b0691a" stroke-width="1.5"/>
+    <text x="40" y="208" font-size="15" font-weight="700" fill="#8a5012">BACKEND API — FastAPI · Uvicorn  (localhost:8000)</text>
+    <rect x="60"  y="222" width="215" height="60" rx="9" fill="#fff" stroke="#b0691a"/>
+    <text x="167" y="248" font-size="13" font-weight="600" text-anchor="middle">upload router</text>
+    <text x="167" y="266" font-size="11" text-anchor="middle" fill="#4b5568">POST /api/upload/{session}</text>
+    <rect x="300" y="222" width="215" height="60" rx="9" fill="#fff" stroke="#b0691a"/>
+    <text x="407" y="248" font-size="13" font-weight="600" text-anchor="middle">chat router</text>
+    <text x="407" y="266" font-size="11" text-anchor="middle" fill="#4b5568">POST /api/chat</text>
+    <rect x="540" y="222" width="215" height="60" rx="9" fill="#fff" stroke="#b0691a"/>
+    <text x="647" y="248" font-size="13" font-weight="600" text-anchor="middle">catalog router</text>
+    <text x="647" y="266" font-size="11" text-anchor="middle" fill="#4b5568">GET/POST /api/catalog/*</text>
+    <rect x="780" y="222" width="200" height="60" rx="9" fill="#fff" stroke="#b0691a"/>
+    <text x="880" y="248" font-size="13" font-weight="600" text-anchor="middle">multi-doc router</text>
+    <text x="880" y="266" font-size="11" text-anchor="middle" fill="#4b5568">POST /api/multi-doc/query</text>
+
+    <!-- arrow to agents -->
+    <line x1="520" y1="300" x2="520" y2="346" stroke="#4b5568" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <text x="535" y="328" font-size="12" fill="#4b5568" font-weight="600">route by mode / data context</text>
+
+    <!-- ── AGENT TIER ── -->
+    <rect x="20" y="350" width="1000" height="210" rx="14" fill="#f0eafa" stroke="#6b46c1" stroke-width="1.5"/>
+    <text x="40" y="378" font-size="15" font-weight="700" fill="#4d2f96">AGENT LAYER — LangChain orchestration</text>
+
+    <rect x="60" y="392" width="290" height="64" rx="9" fill="#fff" stroke="#b0691a" stroke-width="1.5"/>
+    <text x="205" y="416" font-size="13" font-weight="600" text-anchor="middle">🧭 Orchestrator Agent</text>
+    <text x="205" y="434" font-size="11" text-anchor="middle" fill="#4b5568">keyword/regex classifier — MATH | REASON | OTHER</text>
+    <text x="205" y="448" font-size="11" text-anchor="middle" fill="#4b5568">(zero LLM cost)</text>
+
+    <rect x="380" y="392" width="290" height="64" rx="9" fill="#fff" stroke="#6b46c1" stroke-width="1.5"/>
+    <text x="525" y="416" font-size="13" font-weight="600" text-anchor="middle">🧮 General Agent</text>
+    <text x="525" y="434" font-size="11" text-anchor="middle" fill="#4b5568">tools: calculator · percentage · unit converter</text>
+    <text x="525" y="448" font-size="11" text-anchor="middle" fill="#4b5568">· logical reasoner (chain-of-thought)</text>
+
+    <rect x="700" y="392" width="280" height="64" rx="9" fill="#fff" stroke="#1f8a5c" stroke-width="1.5"/>
+    <text x="840" y="416" font-size="13" font-weight="600" text-anchor="middle">🗃️ SQL Agent</text>
+    <text x="840" y="434" font-size="11" text-anchor="middle" fill="#4b5568">Text-to-SQL → validated SELECT-only</text>
+    <text x="840" y="448" font-size="11" text-anchor="middle" fill="#4b5568">→ execute → summarize + chart hint</text>
+
+    <rect x="60" y="476" width="290" height="64" rx="9" fill="#fff" stroke="#2d5bd1" stroke-width="1.5"/>
+    <text x="205" y="500" font-size="13" font-weight="600" text-anchor="middle">📊 Data Agent (DataFrame)</text>
+    <text x="205" y="518" font-size="11" text-anchor="middle" fill="#4b5568">pandas summary + stats → Gemini</text>
+    <text x="205" y="532" font-size="11" text-anchor="middle" fill="#4b5568">conversation memory · chart hints</text>
+
+    <rect x="380" y="476" width="290" height="64" rx="9" fill="#fff" stroke="#6b46c1" stroke-width="1.5"/>
+    <text x="525" y="500" font-size="13" font-weight="600" text-anchor="middle">📚 RAG Agent</text>
+    <text x="525" y="518" font-size="11" text-anchor="middle" fill="#4b5568">similarity search on ChromaDB →</text>
+    <text x="525" y="532" font-size="11" text-anchor="middle" fill="#4b5568">grounded answer + cited sources</text>
+
+    <rect x="700" y="476" width="280" height="64" rx="9" fill="#fff" stroke="#b23a48" stroke-width="1.5"/>
+    <text x="840" y="500" font-size="13" font-weight="600" text-anchor="middle">🔀 Multi-Doc Agent</text>
+    <text x="840" y="518" font-size="11" text-anchor="middle" fill="#4b5568">retrieve from N collections →</text>
+    <text x="840" y="532" font-size="11" text-anchor="middle" fill="#4b5568">synthesize | compare | per-doc</text>
+
+    <!-- arrows to storage/LLM -->
+    <line x1="270" y1="560" x2="270" y2="606" stroke="#4b5568" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <line x1="770" y1="560" x2="770" y2="606" stroke="#4b5568" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+    <!-- ── STORAGE TIER ── -->
+    <rect x="20" y="610" width="490" height="150" rx="14" fill="#e6f4ec" stroke="#1f8a5c" stroke-width="1.5"/>
+    <text x="40" y="638" font-size="15" font-weight="700" fill="#166344">STORAGE &amp; DATA</text>
+    <rect x="45"  y="652" width="210" height="44" rx="8" fill="#fff" stroke="#1f8a5c"/>
+    <text x="150" y="670" font-size="12" font-weight="600" text-anchor="middle">ChromaDB (persistent)</text>
+    <text x="150" y="686" font-size="10.5" text-anchor="middle" fill="#4b5568">document embeddings · chroma_data/</text>
+    <rect x="275" y="652" width="210" height="44" rx="8" fill="#fff" stroke="#1f8a5c"/>
+    <text x="380" y="670" font-size="12" font-weight="600" text-anchor="middle">SQLite — catalog.db</text>
+    <text x="380" y="686" font-size="10.5" text-anchor="middle" fill="#4b5568">document catalog metadata (SQLAlchemy)</text>
+    <rect x="45"  y="706" width="210" height="44" rx="8" fill="#fff" stroke="#1f8a5c"/>
+    <text x="150" y="724" font-size="12" font-weight="600" text-anchor="middle">In-memory session store</text>
+    <text x="150" y="740" font-size="10.5" text-anchor="middle" fill="#4b5568">pandas DataFrames per session</text>
+    <rect x="275" y="706" width="210" height="44" rx="8" fill="#fff" stroke="#1f8a5c"/>
+    <text x="380" y="724" font-size="12" font-weight="600" text-anchor="middle">In-memory SQLite</text>
+    <text x="380" y="740" font-size="10.5" text-anchor="middle" fill="#4b5568">sandboxed DB per session (Text-to-SQL)</text>
+
+    <!-- ── LLM TIER ── -->
+    <rect x="530" y="610" width="490" height="150" rx="14" fill="#fce9ec" stroke="#b23a48" stroke-width="1.5"/>
+    <text x="550" y="638" font-size="15" font-weight="700" fill="#8f2e3a">GOOGLE GEMINI (free tier)</text>
+    <rect x="555" y="652" width="215" height="44" rx="8" fill="#fff" stroke="#b23a48"/>
+    <text x="662" y="670" font-size="12" font-weight="600" text-anchor="middle">gemini-2.5-flash</text>
+    <text x="662" y="686" font-size="10.5" text-anchor="middle" fill="#4b5568">reasoning · SQL generation · answers</text>
+    <rect x="785" y="652" width="215" height="44" rx="8" fill="#fff" stroke="#b23a48"/>
+    <text x="892" y="670" font-size="12" font-weight="600" text-anchor="middle">gemini-embedding-001</text>
+    <text x="892" y="686" font-size="10.5" text-anchor="middle" fill="#4b5568">text embeddings for vector search</text>
+    <rect x="555" y="706" width="445" height="44" rx="8" fill="#fff" stroke="#b23a48"/>
+    <text x="777" y="724" font-size="12" font-weight="600" text-anchor="middle">Plotly chart generator</text>
+    <text x="777" y="740" font-size="10.5" text-anchor="middle" fill="#4b5568">turns agent chart hints ("Chart: bar on X vs Y") into interactive JSON figures</text>
+  </svg>
+  </div>
+
+  <h3>Layer responsibilities</h3>
+  <table>
+    <tr><th>Layer</th><th>Components</th><th>Responsibility</th></tr>
+    <tr>
+      <td><strong>Frontend</strong></td>
+      <td>Next.js pages: Chat, Catalog, Multi-Doc</td>
+      <td>File upload, mode selection (auto / SQL / DataFrame / RAG / general), rendering answers, sources, and Plotly charts.</td>
+    </tr>
+    <tr>
+      <td><strong>API</strong></td>
+      <td><code>routers/</code> — upload, chat, catalog, multi_doc</td>
+      <td>Validates requests, enforces upload size + file-type limits, decides which agent handles each question, updates catalog stats.</td>
+    </tr>
+    <tr>
+      <td><strong>Agents</strong></td>
+      <td><code>agents/</code> — orchestrator, data, sql, rag, multi_doc, general</td>
+      <td>All LLM orchestration: prompt construction, tool use, SQL safety validation, retrieval, answer synthesis, chart hints.</td>
+    </tr>
+    <tr>
+      <td><strong>Pipelines</strong></td>
+      <td><code>pipelines/</code> — csv, json, pdf, sql loaders</td>
+      <td>Parse uploads into DataFrames or text chunks; mirror DataFrames into a sandboxed in-memory SQLite DB.</td>
+    </tr>
+    <tr>
+      <td><strong>Storage</strong></td>
+      <td>ChromaDB, SQLite (<code>catalog.db</code>), in-memory session stores</td>
+      <td>Persistent vector embeddings, catalog metadata, and per-session tabular data.</td>
+    </tr>
+  </table>
+</section>
+
+<!-- ══════════════════════ DATA FLOW ══════════════════════ -->
+<section id="dataflow">
+  <h2>🔄 Data Flow</h2>
+
+  <h3>Flow 1 — File Upload &amp; Ingestion</h3>
+  <p>Every interaction starts with <code>POST /api/upload/{session_id}</code>. The pipeline branches on file type:</p>
+  <ol class="flow-steps">
+    <li>The upload router validates the file type (<code>.csv .xlsx .xls .json .pdf</code>) and enforces the size cap (default 20&nbsp;MB), then writes the file to a temp location.</li>
+    <li><strong>Tabular files</strong> (CSV / Excel / JSON) are parsed into a pandas <strong>DataFrame</strong> and stored in the in-memory session store; the DataFrame is also mirrored into a <strong>sandboxed in-memory SQLite database</strong> so the SQL Agent can query it.</li>
+    <li><strong>PDF files</strong> are split into text chunks by the PDF loader, embedded with <code>gemini-embedding-001</code>, and ingested into a <strong>session-scoped ChromaDB collection</strong> for immediate chat.</li>
+    <li>PDFs are <em>also</em> ingested into a <strong>permanent ChromaDB collection</strong>, and Gemini auto-generates a <strong>summary, category, and tags</strong> which are saved to the SQLite catalog (<code>catalog.db</code>) — making the document searchable and reusable forever.</li>
+  </ol>
+
+  <h3>Flow 2 — Chat Query Routing</h3>
+  <p>When a question arrives at <code>POST /api/chat</code>, the chat router decides which agent answers, in this priority order:</p>
+  <ol class="flow-steps">
+    <li><strong>Multiple <code>doc_ids</code> present?</strong> → route to the <strong>Multi-Doc Agent</strong>, which retrieves chunks from every selected catalog collection and answers in the requested mode (synthesize / compare / per-doc).</li>
+    <li><strong>Single <code>doc_id</code> present?</strong> → route to the <strong>RAG Agent</strong> against that document's permanent catalog collection, and update its query-count / last-accessed stats.</li>
+    <li><strong>Mode = <code>general</code></strong>, or no data uploaded yet and the <strong>Orchestrator Agent</strong> classifies the question as MATH or REASON → route to the <strong>General Agent</strong> and its local tools.</li>
+    <li><strong>Documents uploaded in session (RAG mode / auto)</strong> → the <strong>RAG Agent</strong> retrieves the most similar chunks from the session's ChromaDB collection, injects them as context, and Gemini produces a grounded answer with cited sources.</li>
+    <li><strong>Tabular data with SQL mode (or auto)</strong> → the <strong>SQL Agent</strong>: Gemini sees the table schema, generates a query, the backend <em>validates it is a single read-only SELECT/WITH statement</em> (blocking INSERT/UPDATE/DROP/chaining), executes it against the in-memory SQLite DB, and Gemini summarizes the results.</li>
+    <li><strong>Otherwise</strong> → the <strong>Data Agent</strong>: a compact DataFrame summary (shape, columns, sample rows, descriptive stats) is injected into the prompt along with conversation memory, and Gemini analyzes it directly.</li>
+    <li><strong>Chart generation</strong> — if the agent's answer includes a chart hint like <code>Chart: bar on Department vs AttritionRate</code>, the chart generator builds an interactive <strong>Plotly figure (JSON)</strong> which the frontend renders inline.</li>
+    <li>The response returns as <code>{ answer, chart_json, sql_query, sources }</code> — so the user sees the answer, the evidence, and how it was derived.</li>
+  </ol>
+
+  <h3>Routing decision summary</h3>
+  <table>
+    <tr><th>Condition on the request</th><th>Agent selected</th><th>Data source used</th></tr>
+    <tr><td><code>doc_ids</code> (2–10 documents)</td><td>Multi-Doc Agent</td><td>Multiple permanent ChromaDB collections</td></tr>
+    <tr><td><code>doc_id</code> (one catalog document)</td><td>RAG Agent</td><td>Permanent ChromaDB collection</td></tr>
+    <tr><td>Mode <code>general</code>, or no data + MATH/REASON detected</td><td>General Agent</td><td>Local tools + Gemini reasoning</td></tr>
+    <tr><td>Session PDF uploaded, mode <code>rag</code>/<code>auto</code></td><td>RAG Agent</td><td>Session ChromaDB collection</td></tr>
+    <tr><td>Tabular data, mode <code>sql</code>/<code>auto</code></td><td>SQL Agent</td><td>In-memory SQLite (SELECT-only)</td></tr>
+    <tr><td>Tabular data, mode <code>dataframe</code></td><td>Data Agent</td><td>pandas DataFrame summary + memory</td></tr>
+  </table>
+</section>
+
+<!-- ══════════════════════ AGENTS ══════════════════════ -->
+<section id="agents">
+  <h2>🤖 The Agents</h2>
+  <p>Six specialized agents live in <code>backend/agents/</code>. Each owns one style of reasoning; the chat router composes them into a single seamless experience.</p>
+
+  <div class="card agent-card orch">
+    <h3 style="margin-top:0">🧭 Orchestrator Agent <span class="pill amber">zero LLM cost</span></h3>
+    <p><code>orchestrator_agent.py</code> — Classifies incoming questions as <strong>MATH</strong>, <strong>REASON</strong>, or <strong>OTHER</strong> using pure keyword and regex heuristics (e.g. detecting numeric expressions like <code>12 * 34</code>, or reasoning cues like "prove that", "syllogism"). Because it never calls the LLM, routing consumes no API quota — a deliberate design choice for the free tier.</p>
+  </div>
+
+  <div class="card agent-card">
+    <h3 style="margin-top:0">📊 Data Agent <span class="pill blue">DataFrame analysis</span></h3>
+    <p><code>data_agent.py</code> — Builds a token-efficient summary of the loaded DataFrame (shape, columns, first rows, descriptive statistics) and sends it to Gemini together with the question via a LangChain ConversationChain. Maintains <strong>per-session conversation memory</strong> so follow-up questions have context, and parses chart hints from the answer to trigger Plotly generation.</p>
+  </div>
+
+  <div class="card agent-card sql">
+    <h3 style="margin-top:0">🗃️ SQL Agent <span class="pill green">Text-to-SQL</span></h3>
+    <p><code>sql_agent.py</code> — Five-step flow: (1) Gemini receives the table schema and question, (2) generates a SQL query, (3) the backend <strong>validates it is a single read-only SELECT/WITH</strong> — rejecting INSERT/UPDATE/DELETE/DROP/PRAGMA and statement chaining, (4) executes it against the sandboxed in-memory SQLite copy of the uploaded data, (5) Gemini summarizes the raw results into plain English. The generated SQL is returned to the user for full transparency.</p>
+  </div>
+
+  <div class="card agent-card rag">
+    <h3 style="margin-top:0">📚 RAG Agent <span class="pill purple">grounded document Q&amp;A</span></h3>
+    <p><code>rag_agent.py</code> — Runs similarity search over ChromaDB (session collection or a permanent catalog collection), assembles the top-matching chunks into a context block, and asks Gemini to answer <strong>only from that context</strong>. Returns cited source filenames alongside the answer, so users can verify where information came from.</p>
+  </div>
+
+  <div class="card agent-card multi">
+    <h3 style="margin-top:0">🔀 Multi-Doc Agent <span class="pill purple">cross-document</span></h3>
+    <p><code>multi_doc_agent.py</code> — Retrieves relevant chunks from <em>each</em> selected document's collection (up to 10), annotates them by source, and answers in one of three modes: <strong>synthesize</strong> (one unified answer across all docs), <strong>compare</strong> (similarities and differences), or <strong>per_doc</strong> (a separate answer for each document).</p>
+  </div>
+
+  <div class="card agent-card orch">
+    <h3 style="margin-top:0">🧮 General Agent <span class="pill amber">tool-using agent</span></h3>
+    <p><code>general_agent.py</code> — A LangChain tool-calling agent with four tools:</p>
+    <table>
+      <tr><th>Tool</th><th>What it does</th></tr>
+      <tr><td><code>calculator</code></td><td>Safe math evaluation via an AST whitelist (no <code>eval()</code>) — supports sqrt, log, trig, powers.</td></tr>
+      <tr><td><code>percentage</code></td><td>Percentage calculations ("what is 15% of 240").</td></tr>
+      <tr><td><code>unit_converter</code></td><td>km↔miles, kg↔pounds, °C↔°F, and more.</td></tr>
+      <tr><td><code>logical_reasoner</code></td><td>Chain-of-thought reasoning through Gemini for puzzles, syllogisms, and deduction.</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ══════════════════════ TOOLS ══════════════════════ -->
+<section id="tools">
+  <h2>🧰 Tools &amp; Technology Stack</h2>
+  <table>
+    <tr><th>Category</th><th>Technology</th><th>Role in Enterprise Q</th></tr>
+    <tr><td rowspan="2"><strong>Frontend</strong></td><td>Next.js 14 + TypeScript</td><td>App-router pages for Chat, Catalog, and Multi-Doc views.</td></tr>
+    <tr><td>Tailwind CSS + shadcn/ui</td><td>Styling and accessible UI components.</td></tr>
+    <tr><td rowspan="2"><strong>Backend</strong></td><td>FastAPI + Uvicorn</td><td>REST API, CORS enforcement, Swagger docs at <code>/docs</code>; blocking LLM calls run in worker threads.</td></tr>
+    <tr><td>Pydantic</td><td>Request/response schema validation (<code>ChatRequest</code>, <code>ChatResponse</code>, …).</td></tr>
+    <tr><td rowspan="3"><strong>AI / LLM</strong></td><td>Google Gemini 2.5 Flash</td><td>All generation: SQL synthesis, data analysis, RAG answers, reasoning, document summarization. Free tier.</td></tr>
+    <tr><td>Gemini Embedding 001</td><td>Text embeddings for document chunks and query similarity search.</td></tr>
+    <tr><td>LangChain (core, community, google-genai, classic)</td><td>LLM wiring, conversation chains, tool-calling agent, retriever abstractions, SQLDatabase utility.</td></tr>
+    <tr><td rowspan="3"><strong>Data &amp; storage</strong></td><td>ChromaDB (persistent client)</td><td>Vector store — session-scoped and permanent collections under <code>chroma_data/</code>.</td></tr>
+    <tr><td>SQLite + SQLAlchemy</td><td><code>catalog.db</code> for the document catalog; separate in-memory SQLite per session for sandboxed Text-to-SQL.</td></tr>
+    <tr><td>pandas + openpyxl + pypdf</td><td>Parsing CSV/Excel/JSON into DataFrames and extracting PDF text.</td></tr>
+    <tr><td><strong>Visualization</strong></td><td>Plotly</td><td>Interactive charts generated from agent chart hints, delivered as JSON to the frontend.</td></tr>
+    <tr><td><strong>Ops</strong></td><td>Docker Compose, python-dotenv, pytest</td><td>Containerized run, environment configuration (<code>GOOGLE_API_KEY</code>, <code>ALLOWED_ORIGINS</code>, <code>MAX_UPLOAD_MB</code>), test suite.</td></tr>
+  </table>
+
+  <h3>Safety &amp; cost design choices</h3>
+  <div class="grid">
+    <div class="feature"><h4>🛡️ SQL sandboxing</h4><p>LLM-generated SQL runs only against a per-session in-memory database, and only single read-only SELECT/WITH statements pass validation.</p></div>
+    <div class="feature"><h4>🛡️ Safe math</h4><p>The calculator evaluates expressions through an AST operator whitelist — never <code>eval()</code>.</p></div>
+    <div class="feature"><h4>🛡️ Upload guards</h4><p>File type allowlist and configurable size cap before any processing happens; CORS restricted to configured origins.</p></div>
+    <div class="feature"><h4>💸 Quota-aware routing</h4><p>The orchestrator classifies questions with regex/keywords instead of an LLM call, and compact DataFrame summaries keep token usage low.</p></div>
+  </div>
+</section>
+
+<!-- ══════════════════════ API ══════════════════════ -->
+<section id="api">
+  <h2>🔌 API Reference</h2>
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+    <tr><td><code>POST</code></td><td><code>/api/upload/{session_id}</code></td><td>Upload a CSV, Excel, JSON, or PDF file for a session.</td></tr>
+    <tr><td><code>DELETE</code></td><td><code>/api/upload/{session_id}</code></td><td>Clear all session data (DataFrame, DB, vectors).</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/chat</code></td><td>Ask a question — body: <code>{ session_id, question, mode, doc_id, doc_ids, multi_doc_mode }</code>; returns <code>{ answer, chart_json, sql_query, sources }</code>.</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/catalog/list</code></td><td>List all catalog documents with summaries, categories, tags.</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/catalog/search</code></td><td>Search catalog documents.</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/catalog/pin</code></td><td>Pin or unpin a document.</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/catalog/stats</code></td><td>Catalog analytics (counts, most-queried docs).</td></tr>
+    <tr><td><code>DELETE</code></td><td><code>/api/catalog/{doc_id}</code></td><td>Delete a document from the catalog and its vector collection.</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/multi-doc/query</code></td><td>Query multiple documents (synthesize / compare / per_doc).</td></tr>
+    <tr><td><code>GET</code></td><td><code>/health</code></td><td>Liveness probe.</td></tr>
+  </table>
+
+  <h3>Quick start</h3>
+  <pre><code># 1. Configure environment
+cp .env.example .env        # add your GOOGLE_API_KEY
+
+# 2. Backend
+cd backend
+pip install -r ../requirements.txt
+uvicorn main:app --reload    # → http://localhost:8000  (Swagger at /docs)
+
+# 3. Frontend
+cd frontend
+npm install
+npm run dev                  # → http://localhost:3000</code></pre>
+</section>
+
+</main>
+
+<footer>
+  Enterprise Q — AI-powered enterprise data assistant · FastAPI · Next.js · Gemini · LangChain · ChromaDB · MIT License
+</footer>
+
+</body>
+</html>

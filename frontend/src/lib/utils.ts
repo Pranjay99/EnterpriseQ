@@ -6,7 +6,9 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function generateSessionId(): string {
-  return Math.random().toString(36).substring(2, 10)
+  // crypto.randomUUID is unguessable — session IDs scope access to uploaded data,
+  // so they must not be predictable.
+  return crypto.randomUUID()
 }
 
 export function formatDate(dateStr: string): string {

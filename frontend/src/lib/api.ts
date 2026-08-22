@@ -1,30 +1,55 @@
-import type { ChatRequest, ChatResponse, CatalogStats, MultiDocMode } from '@/types'
+import type {
+  ChatRequest,
+  ChatResponse,
+  CatalogListResponse,
+  CatalogStats,
+  MultiDocMode,
+  MultiDocResponse,
+  UploadResponse,
+} from '@/types'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-export async function uploadFile(sessionId: string, file: File) {
+/**
+ * Unwrap a fetch Response: on error, surface FastAPI's `detail` message
+ * (never the raw response body, which may contain internals).
+ */
+async function handleResponse<T>(res: Response): Promise<T> {
+  if (!res.ok) {
+    let message = `Request failed with status ${res.status}`
+    try {
+      const data = await res.json()
+      if (typeof data?.detail === 'string') message = data.detail
+    } catch {
+      // Non-JSON error body — keep the generic message
+    }
+    throw new Error(message)
+  }
+  return res.json() as Promise<T>
+}
+
+export async function uploadFile(sessionId: string, file: File): Promise<UploadResponse> {
   const formData = new FormData()
   formData.append('file', file)
   const res = await fetch(`${API_BASE}/api/upload/${sessionId}`, {
     method: 'POST',
     body: formData,
   })
-  if (!res.ok) throw new Error(await res.text())
-  return res.json()
+  return handleResponse<UploadResponse>(res)
 }
 
 export async function clearSession(sessionId: string) {
-  await fetch(`${API_BASE}/api/upload/${sessionId}`, { method: 'DELETE' })
+  const res = await fetch(`${API_BASE}/api/upload/${sessionId}`, { method: 'DELETE' })
+  return handleResponse<{ message: string }>(res)
 }
 
-export async function sendChat(body: ChatRequest) {
+export async function sendChat(body: ChatRequest): Promise<ChatResponse> {
   const res = await fetch(`${API_BASE}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error(await res.text())
-  return res.json() as Promise<ChatResponse>
+  return handleResponse<ChatResponse>(res)
 }
 
 export async function getCatalogList(params?: {
@@ -37,8 +62,7 @@ export async function getCatalogList(params?: {
   if (params?.category) url.searchParams.set('category', params.category)
   if (params?.sort_by) url.searchParams.set('sort_by', params.sort_by)
   const res = await fetch(url.toString())
-  if (!res.ok) throw new Error(await res.text())
-  return res.json()
+  return handleResponse<CatalogListResponse>(res)
 }
 
 export async function searchCatalog(q: string, category?: string) {
@@ -46,8 +70,7 @@ export async function searchCatalog(q: string, category?: string) {
   url.searchParams.set('q', q)
   if (category) url.searchParams.set('category', category)
   const res = await fetch(url.toString())
-  if (!res.ok) throw new Error(await res.text())
-  return res.json()
+  return handleResponse<CatalogListResponse>(res)
 }
 
 export async function pinDocument(docId: number, pinned: boolean) {
@@ -56,20 +79,17 @@ export async function pinDocument(docId: number, pinned: boolean) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ doc_id: docId, pinned }),
   })
-  if (!res.ok) throw new Error(await res.text())
-  return res.json()
+  return handleResponse(res)
 }
 
-export async function getCatalogStats() {
+export async function getCatalogStats(): Promise<CatalogStats> {
   const res = await fetch(`${API_BASE}/api/catalog/stats`)
-  if (!res.ok) throw new Error(await res.text())
-  return res.json() as Promise<CatalogStats>
+  return handleResponse<CatalogStats>(res)
 }
 
 export async function deleteDocument(docId: number) {
   const res = await fetch(`${API_BASE}/api/catalog/${docId}`, { method: 'DELETE' })
-  if (!res.ok) throw new Error(await res.text())
-  return res.json()
+  return handleResponse(res)
 }
 
 export async function queryMultiDoc(body: {
@@ -82,6 +102,5 @@ export async function queryMultiDoc(body: {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error(await res.text())
-  return res.json()
+  return handleResponse<MultiDocResponse>(res)
 }

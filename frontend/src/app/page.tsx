@@ -6,6 +6,7 @@ import { ChatSidebar } from '@/components/chat/ChatSidebar'
 import { ChatMessages } from '@/components/chat/ChatMessages'
 import { ChatInput } from '@/components/chat/ChatInput'
 import { sendChat } from '@/lib/api'
+import { generateSessionId } from '@/lib/utils'
 import type { Message, QueryMode, MultiDocMode } from '@/types'
 
 export default function ChatPage() {
@@ -16,7 +17,7 @@ export default function ChatPage() {
     if (stored) {
       setSessionId(stored)
     } else {
-      const id = Math.random().toString(36).substring(2, 10)
+      const id = generateSessionId()
       sessionStorage.setItem('session_id', id)
       setSessionId(id)
     }
@@ -33,7 +34,7 @@ export default function ChatPage() {
   const [uploadedFile, setUploadedFile] = useState<{
     name: string
     rows?: number
-    columns?: number
+    columns?: string[]
     chunks?: number
   } | null>(null)
   // Read URL params for catalog/multi-doc selections
@@ -56,7 +57,7 @@ export default function ChatPage() {
 
   const handleSend = useCallback(
     async (question: string) => {
-      if (!question.trim() || isLoading) return
+      if (!question.trim() || isLoading || !sessionId) return
 
       const userMsg: Message = {
         id: uuidv4(),
@@ -139,7 +140,7 @@ export default function ChatPage() {
           multiDocIds={multiDocIds}
           catalogDocId={catalogDocId}
         />
-        <ChatInput onSend={handleSend} isLoading={isLoading} disabled={false} />
+        <ChatInput onSend={handleSend} isLoading={isLoading} disabled={!sessionId} />
       </div>
     </div>
   )

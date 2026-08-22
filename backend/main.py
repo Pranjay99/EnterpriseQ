@@ -8,6 +8,8 @@ Interactive API docs:
   http://localhost:8000/docs   (Swagger UI)
   http://localhost:8000/redoc  (ReDoc)
 """
+import os
+
 import uvicorn
 from dotenv import load_dotenv
 load_dotenv()   # Load .env before anything else imports os.getenv()
@@ -26,10 +28,16 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS — allow the Streamlit frontend (runs on port 8501) to call the API
+# CORS — only allow the configured frontend origin(s) to call the API.
+# Set ALLOWED_ORIGINS in .env as a comma-separated list for other environments.
+_allowed_origins = [
+    origin.strip()
+    for origin in os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+    if origin.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # tighten this in production
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

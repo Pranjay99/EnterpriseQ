@@ -10,6 +10,7 @@ POST /api/upload/{session_id}
 
 import json
 import os
+import shutil
 import tempfile
 
 import pandas as pd
@@ -37,6 +38,9 @@ _summarize_llm = ChatGoogleGenerativeAI(
 
 router = APIRouter()
 
+# Maximum upload size in megabytes (override via MAX_UPLOAD_MB in .env)
+MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "20"))
+
 # Shared in-memory store: session_id -> DataFrame
 # Imported by chat.py to look up the active DataFrame for a session.
 _dataframes: dict[str, pd.DataFrame] = {}
@@ -46,11 +50,14 @@ _databases: dict[str, object] = {}
 
 
 @router.post("/upload/{session_id}", response_model=UploadResponse)
-async def upload_file(session_id: str, file: UploadFile = File(...)):
+def upload_file(session_id: str, file: UploadFile = File(...)):
     """
     Upload a data file for a session.
 
-    Supported formats: .csv, .xlsx, .xls, .json
+    Supported formats: .csv, .xlsx, .xls, .json, .pdf
+
+    Note: this is a plain `def` so FastAPI runs it in a worker thread —
+    the LLM/embedding calls below are blocking and must stay off the event loop.
     """
     filename = file.filename or "unknown"
     suffix = os.path.splitext(filename)[1].lower()
@@ -61,9 +68,22 @@ async def upload_file(session_id: str, file: UploadFile = File(...)):
             detail=f"Unsupported file type '{suffix}'. Use .csv, .xlsx, .xls, .json, or .pdf.",
         )
 
+    # Enforce the upload size cap before doing any work
+    size = file.size
+    if size is None:
+        file.file.seek(0, os.SEEK_END)
+        size = file.file.tell()
+        file.file.seek(0)
+    if size > MAX_UPLOAD_MB * 1024 * 1024:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File is {size / (1024 * 1024):.1f} MB — the maximum allowed "
+                   f"upload size is {MAX_UPLOAD_MB} MB.",
+        )
+
     # Write upload to a temp file so loaders can use file-path APIs
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(await file.read())
+        shutil.copyfileobj(file.file, tmp)
         tmp_path = tmp.name
 
     try:

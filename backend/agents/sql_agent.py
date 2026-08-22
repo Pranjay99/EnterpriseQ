@@ -57,12 +57,34 @@ def _extract_sql(llm_output: str) -> str:
     return cleaned
 
 
+# Statements that could modify data or escape the sandboxed in-memory DB.
+_FORBIDDEN_SQL_RE = re.compile(
+    r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|REPLACE|TRUNCATE"
+    r"|ATTACH|DETACH|PRAGMA|VACUUM|REINDEX|GRANT|REVOKE)\b",
+    re.IGNORECASE,
+)
+
+
 def _validate_sql(sql: str) -> None:
-    """Basic safety check — only allow SELECT statements."""
-    first_keyword = sql.strip().split()[0].upper() if sql.strip() else ""
+    """Safety check — allow exactly one read-only SELECT/WITH statement."""
+    cleaned = sql.strip().rstrip(";").strip()
+    if not cleaned:
+        raise ValueError("The generated SQL query was empty.")
+
+    # Block statement chaining like "SELECT ...; DROP TABLE ..."
+    if ";" in cleaned:
+        raise ValueError("Only a single SQL statement is allowed.")
+
+    first_keyword = cleaned.split()[0].upper()
     if first_keyword not in ("SELECT", "WITH"):
         raise ValueError(
             f"Only SELECT queries are allowed. Got: {first_keyword}..."
+        )
+
+    match = _FORBIDDEN_SQL_RE.search(cleaned)
+    if match:
+        raise ValueError(
+            f"Only read-only queries are allowed. Found forbidden keyword: {match.group(1).upper()}."
         )
 
 

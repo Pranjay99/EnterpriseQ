@@ -21,9 +21,9 @@ interface Props {
   onQueryModeChange: (m: QueryMode) => void
   dataLoaded: boolean
   docLoaded: boolean
-  onDataLoaded: (info: { name: string; rows?: number; columns?: number }) => void
+  onDataLoaded: (info: { name: string; rows?: number; columns?: string[] }) => void
   onDocLoaded: (docId?: number) => void
-  uploadedFile: { name: string; rows?: number; columns?: number; chunks?: number } | null
+  uploadedFile: { name: string; rows?: number; columns?: string[]; chunks?: number } | null
   onNewSession: () => void
   multiDocIds: number[]
   multiDocMode: MultiDocMode
@@ -54,6 +54,10 @@ export function ChatSidebar({
   const [error, setError] = useState<string | null>(null)
 
   const handleFile = async (file: File) => {
+    if (!sessionId) {
+      setError('Session is still initialising — please try again.')
+      return
+    }
     setUploading(true)
     setError(null)
     try {
@@ -146,7 +150,7 @@ export function ChatSidebar({
               )}
               {uploadedFile.columns !== undefined && (
                 <span className="text-[10px] text-muted-foreground">
-                  {uploadedFile.columns} cols
+                  {uploadedFile.columns.length} cols
                 </span>
               )}
               {uploadedFile.chunks !== undefined && (

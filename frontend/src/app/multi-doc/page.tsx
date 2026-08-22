@@ -61,7 +61,7 @@ export default function MultiDocPage() {
   const loadDocs = useCallback(async () => {
     try {
       const data = await getCatalogList()
-      setDocuments(data.documents || data)
+      setDocuments(data.documents)
     } catch {
       setDocuments([])
     } finally {

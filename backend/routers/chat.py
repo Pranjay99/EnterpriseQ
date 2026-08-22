@@ -8,6 +8,7 @@ POST /api/chat
   - Returns { answer, chart_json, sql_query, sources }
 """
 
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
@@ -23,14 +24,19 @@ from utils.vector_store import get_retriever
 from models.schemas import ChatRequest, ChatResponse
 from models.database import SessionLocal, DocumentCatalog
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(req: ChatRequest):
+def chat(req: ChatRequest):
     """
     Ask a natural-language question about the data loaded for a session,
     or about a cataloged document (via doc_id).
+
+    Plain `def` on purpose: FastAPI runs it in a worker thread, keeping the
+    blocking LLM calls off the event loop.
     """
     # ── If doc_ids is provided, use multi-document query ─────────────
     if req.doc_ids and len(req.doc_ids) > 0:
@@ -134,9 +140,17 @@ async def chat(req: ChatRequest):
             result = query_data(req.session_id, req.question, df)
     except HTTPException:
         raise
-    except Exception as e:
-        err_msg = str(e)
-        raise HTTPException(status_code=500, detail=f"Error processing request: {err_msg}")
+    except ValueError as e:
+        # Deliberate validation errors (e.g. non-SELECT SQL rejected) are safe to show
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        logger.exception(
+            "Chat request failed (session=%s, mode=%s)", req.session_id, use_mode
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Something went wrong while processing your question. Please try again.",
+        )
 
     return ChatResponse(
         answer=result["answer"],

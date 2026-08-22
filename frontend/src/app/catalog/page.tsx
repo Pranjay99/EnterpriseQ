@@ -67,14 +67,14 @@ export default function CatalogPage() {
       let data
       if (search.trim()) {
         data = await searchCatalog(search, category !== 'All' ? category : undefined)
-        setDocuments(data.documents || data)
+        setDocuments(data.documents)
       } else {
         data = await getCatalogList({
           pinned_only: pinnedOnly,
           category: category !== 'All' ? category : undefined,
           sort_by: sortBy,
         })
-        setDocuments(data.documents || data)
+        setDocuments(data.documents)
       }
     } catch {
       setDocuments([])

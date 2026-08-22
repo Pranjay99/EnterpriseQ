@@ -8,6 +8,7 @@ POST /api/multi-doc/query
   - Returns unified answer with per-document source attribution
 """
 
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Depends
@@ -16,6 +17,8 @@ from sqlalchemy.orm import Session
 from agents.multi_doc_agent import query_multi_doc
 from models.database import get_db, DocumentCatalog
 from models.schemas import MultiDocRequest, MultiDocResponse
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -72,8 +75,12 @@ def multi_doc_query(req: MultiDocRequest, db: Session = Depends(get_db)):
             doc_infos=doc_infos,
             mode=req.mode,
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing query: {e}")
+    except Exception:
+        logger.exception("Multi-doc query failed (doc_ids=%s, mode=%s)", req.doc_ids, req.mode)
+        raise HTTPException(
+            status_code=500,
+            detail="Something went wrong while processing your query. Please try again.",
+        )
 
     # Update stats for all queried documents
     now = datetime.now(timezone.utc)
