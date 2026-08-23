@@ -14,9 +14,10 @@ import uvicorn
 from dotenv import load_dotenv
 load_dotenv()   # Load .env before anything else imports os.getenv()
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from auth import get_current_user
 from routers import chat, upload
 from routers import catalog as catalog_router
 from routers import multi_doc as multi_doc_router
@@ -43,10 +44,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(upload.router, prefix="/api", tags=["Upload"])
-app.include_router(chat.router, prefix="/api", tags=["Chat"])
-app.include_router(catalog_router.router, prefix="/api", tags=["Catalog"])
-app.include_router(multi_doc_router.router, prefix="/api", tags=["Multi-Doc"])
+# All /api routes require a valid Supabase session token (see auth.py).
+_protected = [Depends(get_current_user)]
+app.include_router(upload.router, prefix="/api", tags=["Upload"], dependencies=_protected)
+app.include_router(chat.router, prefix="/api", tags=["Chat"], dependencies=_protected)
+app.include_router(catalog_router.router, prefix="/api", tags=["Catalog"], dependencies=_protected)
+app.include_router(multi_doc_router.router, prefix="/api", tags=["Multi-Doc"], dependencies=_protected)
 
 
 @app.on_event("startup")

@@ -23,9 +23,15 @@ class UploadResponse(BaseModel):
     filename: str
     rows: Optional[int] = None
     columns: Optional[List[str]] = None
+    column_types: Optional[dict] = None  # {"col_name": "number" | "text" | ...}
+    size_mb: Optional[float] = None      # Uploaded file size in MB
+    table_name: Optional[str] = None     # SQL table name (data uploads)
     chunks: Optional[int] = None        # Number of text chunks (PDF uploads)
     file_type: str = "data"              # "data" or "document"
     doc_id: Optional[int] = None         # Catalog ID (PDF uploads)
+    category: Optional[str] = None       # Auto-generated (PDF uploads)
+    tags: Optional[List[str]] = None     # Auto-generated (PDF uploads)
+    summary: Optional[str] = None        # Auto-generated (PDF uploads)
     message: str
 
 
@@ -56,6 +62,12 @@ class CatalogListResponse(BaseModel):
 class PinRequest(BaseModel):
     doc_id: int
     pinned: bool
+
+
+class AddTableRequest(BaseModel):
+    session_id: str
+    table_name: str
+    filename: str
 
 
 class CatalogStatsResponse(BaseModel):

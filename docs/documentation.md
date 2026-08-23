@@ -147,6 +147,7 @@ Priority order:
 | Storage | SQLite + SQLAlchemy | `catalog.db` for the document catalog; in-memory SQLite per session for sandboxed Text-to-SQL. |
 | Data | pandas + openpyxl + pypdf | CSV/Excel/JSON parsing; PDF text extraction. |
 | Visualization | Plotly | Interactive charts from agent chart hints, delivered as JSON. |
+| Auth | Supabase Auth (Google sign-in) + PyJWT | Frontend signs in via Google through Supabase; FastAPI verifies the JWT on every `/api` route (`backend/auth.py`) and scopes catalog data per user (`user_id` column). Auth is disabled when `SUPABASE_JWT_SECRET`/`SUPABASE_URL` are unset (local dev only). |
 | Ops | Docker Compose, python-dotenv, pytest | Containerized run, env config (`GOOGLE_API_KEY`, `ALLOWED_ORIGINS`, `MAX_UPLOAD_MB`), tests. |
 
 ### Safety & cost design choices

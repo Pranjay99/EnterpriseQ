@@ -25,6 +25,7 @@ class DocumentCatalog(Base):
     __tablename__ = "document_catalog"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String(64), nullable=False, default="dev-user", index=True)
     filename = Column(String(255), nullable=False)
     file_type = Column(String(20), nullable=False)          # "pdf"
     category = Column(String(100), default="Uncategorized")
@@ -35,11 +36,30 @@ class DocumentCatalog(Base):
     query_count = Column(Integer, default=0)
     is_pinned = Column(Boolean, default=False)
     vector_collection = Column(String(100), nullable=False, unique=True)
+    # For tabular files (csv/excel/json): path to the stored CSV snapshot,
+    # so the data can be reloaded into any future session. NULL for PDFs.
+    file_path = Column(String(500), nullable=True)
 
 
 def init_db():
-    """Create all tables if they don't exist."""
+    """Create all tables if they don't exist, and apply lightweight migrations."""
     Base.metadata.create_all(bind=engine)
+
+    # Migration: add user_id to rows created before authentication existed.
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        cols = [row[1] for row in conn.execute(text("PRAGMA table_info(document_catalog)"))]
+        if "user_id" not in cols:
+            conn.execute(text(
+                "ALTER TABLE document_catalog "
+                "ADD COLUMN user_id VARCHAR(64) NOT NULL DEFAULT 'dev-user'"
+            ))
+            conn.commit()
+        if "file_path" not in cols:
+            conn.execute(text(
+                "ALTER TABLE document_catalog ADD COLUMN file_path VARCHAR(500)"
+            ))
+            conn.commit()
 
 
 def get_db():

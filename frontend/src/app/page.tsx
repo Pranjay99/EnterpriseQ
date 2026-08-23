@@ -1,13 +1,14 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { ChatSidebar } from '@/components/chat/ChatSidebar'
+import { ChatTopBar } from '@/components/chat/ChatTopBar'
 import { ChatMessages } from '@/components/chat/ChatMessages'
 import { ChatInput } from '@/components/chat/ChatInput'
-import { sendChat } from '@/lib/api'
+import { sendChat, getCatalogList, loadCatalogDoc } from '@/lib/api'
 import { generateSessionId } from '@/lib/utils'
-import type { Message, QueryMode, MultiDocMode } from '@/types'
+import type { Message, QueryMode, MultiDocMode, UploadResponse, CatalogItem } from '@/types'
 
 export default function ChatPage() {
   const [sessionId, setSessionId] = useState<string>('')
@@ -25,34 +26,53 @@ export default function ChatPage() {
 
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [queryMode, setQueryMode] = useState<QueryMode>('sql')
-  const [dataLoaded, setDataLoaded] = useState(false)
-  const [docLoaded, setDocLoaded] = useState(false)
-  const [catalogDocId, setCatalogDocId] = useState<number | null>(null)
-  const [multiDocIds, setMultiDocIds] = useState<number[]>([])
+  const [queryMode, setQueryMode] = useState<QueryMode>('auto')
+
+  // All files uploaded this session (data files + PDFs)
+  const [attachments, setAttachments] = useState<UploadResponse[]>([])
+  // Documents picked from the catalog
+  const [catalogDocs, setCatalogDocs] = useState<CatalogItem[]>([])
+  // Universal chat toggle: route questions to the selected documents
+  const [chatWithDocs, setChatWithDocs] = useState(false)
   const [multiDocMode, setMultiDocMode] = useState<MultiDocMode>('synthesize')
-  const [uploadedFile, setUploadedFile] = useState<{
-    name: string
-    rows?: number
-    columns?: string[]
-    chunks?: number
-  } | null>(null)
-  // Read URL params for catalog/multi-doc selections
+
+  // Unique doc ids usable for document chat (only embedded documents — PDFs).
+  // Cataloged data files are loaded as session tables instead.
+  const docIds = useMemo(() => {
+    const ids = [
+      ...attachments
+        .filter((a) => a.file_type === 'document' && a.doc_id != null)
+        .map((a) => a.doc_id as number),
+      ...catalogDocs.filter((c) => c.file_type === 'pdf').map((c) => c.id),
+    ]
+    return Array.from(new Set(ids))
+  }, [attachments, catalogDocs])
+
+  // Read URL params for catalog/multi-doc selections (links from other pages)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    const docId = params.get('doc_id')
-    const docIds = params.get('doc_ids')
+    const single = params.get('doc_id')
+    const multi = params.get('doc_ids')
     const mode = params.get('multi_doc_mode') as MultiDocMode | null
 
-    if (docId) {
-      setCatalogDocId(Number(docId))
-      setQueryMode('rag')
-    }
-    if (docIds) {
-      setMultiDocIds(docIds.split(',').map(Number))
-      if (mode) setMultiDocMode(mode)
-      setQueryMode('rag')
-    }
+    const ids = [
+      ...(single ? [Number(single)] : []),
+      ...(multi ? multi.split(',').map(Number) : []),
+    ].filter((n) => !Number.isNaN(n))
+    if (ids.length === 0) return
+
+    if (mode) setMultiDocMode(mode)
+    getCatalogList()
+      .then((res) => {
+        const picked = res.documents.filter((d) => ids.includes(d.id) && d.file_type === 'pdf')
+        if (picked.length > 0) {
+          setCatalogDocs(picked)
+          setChatWithDocs(true)
+        }
+      })
+      .catch(() => {
+        // Catalog fetch failed (e.g. not signed in yet) — user can re-pick manually
+      })
   }, [])
 
   const handleSend = useCallback(
@@ -68,14 +88,16 @@ export default function ChatPage() {
       setMessages((prev) => [...prev, userMsg])
       setIsLoading(true)
 
+      const useDocs = chatWithDocs && docIds.length > 0
+
       try {
         const res = await sendChat({
           session_id: sessionId,
           question,
           mode: queryMode,
-          doc_id: catalogDocId || undefined,
-          doc_ids: multiDocIds.length > 0 ? multiDocIds : undefined,
-          multi_doc_mode: multiDocIds.length > 0 ? multiDocMode : undefined,
+          doc_id: useDocs && docIds.length === 1 ? docIds[0] : undefined,
+          doc_ids: useDocs && docIds.length > 1 ? docIds : undefined,
+          multi_doc_mode: useDocs && docIds.length > 1 ? multiDocMode : undefined,
         })
 
         const assistantMsg: Message = {
@@ -100,8 +122,48 @@ export default function ChatPage() {
         setIsLoading(false)
       }
     },
-    [sessionId, queryMode, catalogDocId, multiDocIds, multiDocMode, isLoading]
+    [sessionId, queryMode, chatWithDocs, docIds, multiDocMode, isLoading]
   )
+
+  const handleUploaded = (res: UploadResponse) => {
+    setAttachments((prev) => [
+      // Re-uploading the same filename replaces its entry (and its SQL table)
+      ...prev.filter((a) => a.filename !== res.filename),
+      res,
+    ])
+  }
+
+  // Merge catalog metadata into a session attachment after "Add to catalog"
+  const handleCataloged = (filename: string, res: UploadResponse) => {
+    setAttachments((prev) =>
+      prev.map((a) =>
+        a.filename === filename
+          ? { ...a, doc_id: res.doc_id, category: res.category, tags: res.tags, summary: res.summary }
+          : a
+      )
+    )
+  }
+
+  // Load cataloged data files passed via URL (e.g. Chat button on catalog page)
+  useEffect(() => {
+    if (!sessionId) return
+    const params = new URLSearchParams(window.location.search)
+    const loadIds = (params.get('load_doc_ids') ?? '')
+      .split(',')
+      .map(Number)
+      .filter((n) => !Number.isNaN(n) && n > 0)
+    if (loadIds.length === 0) return
+    ;(async () => {
+      for (const id of loadIds) {
+        try {
+          const res = await loadCatalogDoc(id, sessionId)
+          handleUploaded(res)
+        } catch {
+          // Skip entries that fail to load (deleted, not data, etc.)
+        }
+      }
+    })()
+  }, [sessionId])
 
   const handleNewSession = () => {
     sessionStorage.removeItem('session_id')
@@ -112,35 +174,42 @@ export default function ChatPage() {
     <div className="flex h-full">
       <ChatSidebar
         sessionId={sessionId}
-        queryMode={queryMode}
-        onQueryModeChange={setQueryMode}
-        dataLoaded={dataLoaded}
-        docLoaded={docLoaded}
-        onDataLoaded={(info) => {
-          setDataLoaded(true)
-          setUploadedFile(info)
-        }}
-        onDocLoaded={(docId) => {
-          setDocLoaded(true)
-          if (docId) setCatalogDocId(docId)
-        }}
-        uploadedFile={uploadedFile}
+        attachments={attachments}
+        catalogDocs={catalogDocs}
+        onUploaded={handleUploaded}
+        onCataloged={handleCataloged}
+        onAddCatalogDocs={(docs) =>
+          setCatalogDocs((prev) => {
+            const existing = new Set(prev.map((d) => d.id))
+            return [...prev, ...docs.filter((d) => !existing.has(d.id))]
+          })
+        }
+        onRemoveCatalogDoc={(id) =>
+          setCatalogDocs((prev) => prev.filter((d) => d.id !== id))
+        }
         onNewSession={handleNewSession}
-        multiDocIds={multiDocIds}
-        multiDocMode={multiDocMode}
-        onMultiDocModeChange={setMultiDocMode}
-        onClearMultiDoc={() => setMultiDocIds([])}
-        catalogDocId={catalogDocId}
-        onClearCatalogDoc={() => setCatalogDocId(null)}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
+        <ChatTopBar
+          docCount={docIds.length}
+          chatWithDocs={chatWithDocs}
+          onToggleChatWithDocs={() => setChatWithDocs((v) => !v)}
+          multiDocMode={multiDocMode}
+          onMultiDocModeChange={setMultiDocMode}
+        />
         <ChatMessages
           messages={messages}
           isLoading={isLoading}
-          multiDocIds={multiDocIds}
-          catalogDocId={catalogDocId}
+          docCount={docIds.length}
+          chatWithDocs={chatWithDocs}
         />
-        <ChatInput onSend={handleSend} isLoading={isLoading} disabled={!sessionId} />
+        <ChatInput
+          onSend={handleSend}
+          isLoading={isLoading}
+          disabled={!sessionId}
+          queryMode={queryMode}
+          onQueryModeChange={setQueryMode}
+        />
       </div>
     </div>
   )

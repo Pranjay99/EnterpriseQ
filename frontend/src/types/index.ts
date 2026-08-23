@@ -12,9 +12,15 @@ export interface UploadResponse {
   filename: string
   rows?: number
   columns?: string[]
+  column_types?: Record<string, string>
+  size_mb?: number
+  table_name?: string
   chunks?: number
   file_type: 'data' | 'document'
   doc_id?: number
+  category?: string
+  tags?: string[]
+  summary?: string
   message: string
 }
 

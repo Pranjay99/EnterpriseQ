@@ -1,0 +1,9 @@
+department_id,department_name,location,annual_budget_usd,head_of_department
+1,Sales,New York,2500000,Maria Lopez
+2,Engineering,San Francisco,6800000,Chen Wei
+3,Human Resources,Chicago,900000,Aisha Khan
+4,Finance,New York,1800000,Tom Becker
+5,Marketing,Los Angeles,2100000,Sofia Rossi
+6,Operations,Dallas,3200000,James Carter
+7,Legal,New York,1200000,Priya Nair
+8,Research,Boston,4500000,Elena Petrov

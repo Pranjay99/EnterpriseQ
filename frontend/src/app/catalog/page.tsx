@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Search,
   Pin,
@@ -10,8 +10,10 @@ import {
   TrendingUp,
   BookOpen,
   BarChart2,
+  Upload,
+  Loader2,
 } from 'lucide-react'
-import { getCatalogList, getCatalogStats, searchCatalog, pinDocument, deleteDocument } from '@/lib/api'
+import { getCatalogList, getCatalogStats, searchCatalog, pinDocument, deleteDocument, uploadToCatalog } from '@/lib/api'
 import type { CatalogItem, CatalogStats } from '@/types'
 import { cn, formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -60,6 +62,10 @@ export default function CatalogPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [expandedSummary, setExpandedSummary] = useState<Set<number>>(new Set())
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
+  const uploadInputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
 
   const loadDocuments = useCallback(async () => {
     setLoading(true)
@@ -113,13 +119,51 @@ export default function CatalogPage() {
     loadStats()
   }
 
-  const handleChat = (docId: number) => {
-    router.push(`/?doc_id=${docId}`)
+  const handleAddDocuments = async (files: FileList) => {
+    const list = Array.from(files)
+    if (list.length === 0) return
+    setUploading(true)
+    setUploadError(null)
+    const failures: string[] = []
+
+    for (let i = 0; i < list.length; i++) {
+      setUploadProgress(
+        list.length > 1 ? `Adding ${i + 1}/${list.length}: ${list[i].name}` : `Adding ${list[i].name}…`
+      )
+      try {
+        await uploadToCatalog(list[i])
+      } catch (e) {
+        failures.push(`${list[i].name}: ${e instanceof Error ? e.message : 'failed'}`)
+      }
+    }
+
+    setUploadProgress(null)
+    setUploading(false)
+    if (failures.length > 0) setUploadError(failures.join(' · '))
+    loadDocuments()
+    loadStats()
+  }
+
+  const handleChat = (doc: CatalogItem) => {
+    // PDFs are chatted with via embeddings; data files load into the session
+    if (doc.file_type === 'pdf') {
+      router.push(`/?doc_id=${doc.id}`)
+    } else {
+      router.push(`/?load_doc_ids=${doc.id}`)
+    }
   }
 
   const handleMultiChat = () => {
-    const ids = Array.from(selected).join(',')
-    router.push(`/?doc_ids=${ids}&multi_doc_mode=synthesize`)
+    const chosen = documents.filter((d) => selected.has(d.id))
+    const pdfIds = chosen.filter((d) => d.file_type === 'pdf').map((d) => d.id)
+    const dataIds = chosen.filter((d) => d.file_type !== 'pdf').map((d) => d.id)
+    const params = new URLSearchParams()
+    if (pdfIds.length > 0) {
+      params.set(pdfIds.length > 1 ? 'doc_ids' : 'doc_id', pdfIds.join(','))
+      if (pdfIds.length > 1) params.set('multi_doc_mode', 'synthesize')
+    }
+    if (dataIds.length > 0) params.set('load_doc_ids', dataIds.join(','))
+    router.push(`/?${params.toString()}`)
   }
 
   const toggleSelect = (id: number) => {
@@ -221,6 +265,46 @@ export default function CatalogPage() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header: title + add documents */}
+        <div className="border-b border-border bg-card px-6 py-3 flex items-center justify-between shrink-0">
+          <div>
+            <h1 className="text-sm font-semibold">Document Catalog</h1>
+            {uploadError && (
+              <p className="text-[10px] text-destructive mt-0.5 truncate max-w-md" title={uploadError}>
+                {uploadError}
+              </p>
+            )}
+          </div>
+          <Button
+            size="sm"
+            onClick={() => uploadInputRef.current?.click()}
+            disabled={uploading}
+            className="h-8 gap-1.5 text-xs"
+          >
+            {uploading ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                {uploadProgress ?? 'Adding…'}
+              </>
+            ) : (
+              <>
+                <Upload className="w-3.5 h-3.5" /> Add documents
+              </>
+            )}
+          </Button>
+          <input
+            ref={uploadInputRef}
+            type="file"
+            multiple
+            accept=".csv,.xlsx,.xls,.json,.pdf"
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files && e.target.files.length > 0) handleAddDocuments(e.target.files)
+              e.target.value = ''
+            }}
+          />
+        </div>
+
         {/* Stats Bar */}
         {stats && (
           <div className="border-b border-border bg-card px-6 py-3 flex gap-6 shrink-0">
@@ -276,7 +360,7 @@ export default function CatalogPage() {
               <BookOpen className="w-12 h-12 mb-3 opacity-30" />
               <p className="text-sm">No documents found</p>
               <p className="text-xs mt-1 opacity-60">
-                Upload PDFs on the Chat page to populate the catalog
+                Use &quot;Add documents&quot; above, or save files from the Chat page
               </p>
             </div>
           ) : (
@@ -307,6 +391,9 @@ export default function CatalogPage() {
                         <p className="text-sm font-medium truncate">{doc.filename}</p>
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-medium uppercase bg-secondary text-muted-foreground">
+                          {doc.file_type}
+                        </span>
                         <span
                           className={cn(
                             'text-[10px] px-1.5 py-0.5 rounded font-medium',
@@ -372,7 +459,7 @@ export default function CatalogPage() {
                     <Button
                       size="sm"
                       variant="secondary"
-                      onClick={() => handleChat(doc.id)}
+                      onClick={() => handleChat(doc)}
                       className="flex-1 h-7 text-xs gap-1"
                     >
                       <MessageSquare className="w-3 h-3" /> Chat

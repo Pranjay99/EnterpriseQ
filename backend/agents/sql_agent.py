@@ -9,9 +9,11 @@ Flow:
   5. Optionally extracts a chart hint for Plotly visualisation
 """
 
+import logging
 import re
 import os
 
+import httpx
 import pandas as pd
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -24,16 +26,51 @@ from pipelines.sql_loader import get_table_schema
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 llm = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
     temperature=0,
     google_api_key=os.getenv("GOOGLE_API_KEY"),
 )
 
+# ── Optional fine-tuned SQL model (see finetuning/README.md) ─────────────────
+# When SQL_LLM_ENDPOINT is set (any OpenAI-compatible server: Ollama,
+# llama.cpp, Together, ...), SQL GENERATION uses the tuned model; answer
+# summarisation stays on Gemini. Errors fall back to Gemini automatically.
+_SQL_LLM_ENDPOINT = os.getenv("SQL_LLM_ENDPOINT", "").strip().rstrip("/")
+_SQL_LLM_MODEL = os.getenv("SQL_LLM_MODEL", "enterprise-q-sql-lora")
+_SQL_LLM_API_KEY = os.getenv("SQL_LLM_API_KEY", "").strip()
+
+
+def _generate_sql_text(prompt: str) -> str:
+    """Generate raw SQL text — fine-tuned model if configured, else Gemini."""
+    if _SQL_LLM_ENDPOINT:
+        try:
+            headers = {"Content-Type": "application/json"}
+            if _SQL_LLM_API_KEY:
+                headers["Authorization"] = f"Bearer {_SQL_LLM_API_KEY}"
+            resp = httpx.post(
+                f"{_SQL_LLM_ENDPOINT}/chat/completions",
+                json={
+                    "model": _SQL_LLM_MODEL,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0,
+                    "max_tokens": 256,
+                },
+                headers=headers,
+                timeout=60,
+            )
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]["content"]
+        except Exception:
+            logger.warning("Fine-tuned SQL model unavailable — falling back to Gemini")
+    return llm.invoke([HumanMessage(content=prompt)]).content
+
 # Chart-hint regex (same pattern as data_agent)
 _CHART_PATTERN = re.compile(
-    r"Chart:\s*(bar|line|pie|scatter)\s+on\s+(.+?)\s+vs\s+(.+)",
-    re.IGNORECASE,
+    r"Chart:\s*(bar|line|pie|scatter)\s+on\s+(.+?)\s+vs\s+(.+?)(?:\s+using\s+(sum|mean|count))?\s*$",
+    re.IGNORECASE | re.MULTILINE,
 )
 
 # Pattern to extract SQL from markdown code blocks or plain text
@@ -109,8 +146,7 @@ def query_sql(session_id: str, question: str, db: SQLDatabase, df: pd.DataFrame)
         table_schema=schema,
         question=question,
     )
-    gen_response = llm.invoke([HumanMessage(content=gen_prompt)])
-    sql_query = _extract_sql(gen_response.content)
+    sql_query = _extract_sql(_generate_sql_text(gen_prompt))
 
     # ── Step 2: Validate & Execute ────────────────────────────────────────
     _validate_sql(sql_query)
@@ -126,17 +162,26 @@ def query_sql(session_id: str, question: str, db: SQLDatabase, df: pd.DataFrame)
     answer = answer_response.content
 
     # ── Step 4: Chart extraction ──────────────────────────────────────────
+    # Chart the QUERY RESULTS — not the raw table — so the visual matches
+    # the answer (aggregations, filters, and joins included).
     chart_json = None
     match = _CHART_PATTERN.search(answer)
     if match:
         chart_type = match.group(1)
         x_col = match.group(2).strip()
         y_col = match.group(3).strip()
+        agg = match.group(4)
         if "no chart" not in f"{chart_type} {x_col} {y_col}".lower():
             try:
-                chart_json = generate_chart(df, chart_type, x_col, y_col)
+                result_df = pd.read_sql_query(sql_query, db._engine)
+                source = result_df if not result_df.empty else df
+                chart_json = generate_chart(source, chart_type, x_col, y_col, agg=agg)
             except Exception:
-                chart_json = None
+                # Fall back to the raw table rather than dropping the chart
+                try:
+                    chart_json = generate_chart(df, chart_type, x_col, y_col, agg=agg)
+                except Exception:
+                    chart_json = None
 
     return {
         "answer": answer,

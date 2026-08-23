@@ -38,10 +38,10 @@ llm = ChatGoogleGenerativeAI(
     google_api_key=os.getenv("GOOGLE_API_KEY")
 )
 
-# Chart-hint regex: matches "Chart: bar on Department vs AttritionRate"
+# Chart-hint regex: matches "Chart: bar on Department vs Salary using mean"
 _CHART_PATTERN = re.compile(
-    r"Chart:\s*(bar|line|pie|scatter)\s+on\s+(.+?)\s+vs\s+(.+)",
-    re.IGNORECASE,
+    r"Chart:\s*(bar|line|pie|scatter)\s+on\s+(.+?)\s+vs\s+(.+?)(?:\s+using\s+(sum|mean|count))?\s*$",
+    re.IGNORECASE | re.MULTILINE,
 )
 
 
@@ -98,10 +98,11 @@ def query_data(session_id: str, question: str, df: pd.DataFrame) -> dict:
         chart_type = match.group(1)
         x_col = match.group(2).strip()
         y_col = match.group(3).strip()
+        agg = match.group(4)
         # Only generate a chart if "no chart" was not intended
         if "no chart" not in f"{chart_type} {x_col} {y_col}".lower():
             try:
-                chart_json = generate_chart(df, chart_type, x_col, y_col)
+                chart_json = generate_chart(df, chart_type, x_col, y_col, agg=agg)
             except Exception:
                 chart_json = None  # Never crash the response over a chart failure
 

@@ -7,15 +7,27 @@ You have been given the following dataset summary:
 
 Instructions:
 - Answer the user's question concisely and accurately based on the data.
-- If the answer involves numbers, comparisons, or trends, suggest a chart.
-- Use EXACTLY this format at the end of your reply when a chart is appropriate:
-  Chart: <type> on <x_column> vs <y_column>
-  (valid types: bar, line, pie, scatter)
-- If no chart is needed, write: Chart: no chart
 
-Example:
-Answer: The Sales department has the highest attrition rate at 22%.
-Chart: bar on Department vs AttritionRate
+Chart rules:
+- Include a chart ONLY if (a) the user explicitly asked for a chart/graph/plot/visualization,
+  or (b) the answer compares values across categories or shows a trend over time where a
+  visual genuinely helps. For single numbers, lists, or lookups: no chart.
+- If the user asked for a specific chart type (bar, pie, line, scatter), use EXACTLY that type.
+- Pick columns that match the question: x = the category/time column, y = the numeric measure.
+  Use EXACT column names from the dataset.
+- If the raw rows repeat per category, say how to aggregate with "using sum", "using mean",
+  or "using count".
+- End your reply with EXACTLY one line in this format:
+  Chart: <bar|line|pie|scatter> on <x_column> vs <y_column> using <sum|mean|count>
+  ("using ..." is optional if the data is already one row per category)
+- If no chart is warranted, end with: Chart: no chart
+
+Examples:
+Answer: Sales has the highest average salary at $82,300, followed by Engineering at $79,100.
+Chart: bar on Department vs Salary using mean
+
+Answer: The dataset contains 1,240 rows and 8 columns.
+Chart: no chart
 """
 
 # ── Text-to-SQL prompts ─────────────────────────────────────────────────
@@ -51,10 +63,17 @@ The query returned these results:
 Instructions:
 - Write a clear, concise answer in plain English based on the SQL results.
 - Include key numbers and comparisons where relevant.
-- If a chart would help visualise the results, add this at the end:
-  Chart: <type> on <x_column> vs <y_column>
-  (valid types: bar, line, pie, scatter)
-- If no chart is needed, write: Chart: no chart
+
+Chart rules:
+- Include a chart ONLY if (a) the user explicitly asked for a chart/graph/plot/visualization,
+  or (b) the results compare values across categories or show a trend over time where a
+  visual genuinely helps. For a single number or a simple lookup: no chart.
+- If the user asked for a specific chart type (bar, pie, line, scatter), use EXACTLY that type.
+- The chart is drawn from the QUERY RESULT columns above — use the EXACT column names
+  (or aliases) that appear in the SQL result. x = category/time column, y = numeric measure.
+- End your reply with EXACTLY one line in this format:
+  Chart: <bar|line|pie|scatter> on <x_column> vs <y_column>
+- If no chart is warranted, end with: Chart: no chart
 """
 
 # ── RAG (Document Q&A) prompt ───────────────────────────────────────────

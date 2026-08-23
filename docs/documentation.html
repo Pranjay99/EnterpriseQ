@@ -449,6 +449,7 @@
     <tr><td>SQLite + SQLAlchemy</td><td><code>catalog.db</code> for the document catalog; separate in-memory SQLite per session for sandboxed Text-to-SQL.</td></tr>
     <tr><td>pandas + openpyxl + pypdf</td><td>Parsing CSV/Excel/JSON into DataFrames and extracting PDF text.</td></tr>
     <tr><td><strong>Visualization</strong></td><td>Plotly</td><td>Interactive charts generated from agent chart hints, delivered as JSON to the frontend.</td></tr>
+    <tr><td><strong>Auth</strong></td><td>Supabase Auth (Google sign-in) + PyJWT</td><td>Frontend signs in with Google via Supabase; FastAPI verifies the JWT on every <code>/api</code> route (<code>backend/auth.py</code>) and scopes catalog data per user. Disabled when Supabase env vars are unset (local dev only).</td></tr>
     <tr><td><strong>Ops</strong></td><td>Docker Compose, python-dotenv, pytest</td><td>Containerized run, environment configuration (<code>GOOGLE_API_KEY</code>, <code>ALLOWED_ORIGINS</code>, <code>MAX_UPLOAD_MB</code>), test suite.</td></tr>
   </table>
 

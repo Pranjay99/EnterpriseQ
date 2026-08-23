@@ -15,6 +15,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 
 from agents.multi_doc_agent import query_multi_doc
+from auth import get_current_user
 from models.database import get_db, DocumentCatalog
 from models.schemas import MultiDocRequest, MultiDocResponse
 
@@ -24,7 +25,11 @@ router = APIRouter()
 
 
 @router.post("/multi-doc/query", response_model=MultiDocResponse)
-def multi_doc_query(req: MultiDocRequest, db: Session = Depends(get_db)):
+def multi_doc_query(
+    req: MultiDocRequest,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
     """
     Query multiple catalog documents simultaneously.
 
@@ -46,7 +51,10 @@ def multi_doc_query(req: MultiDocRequest, db: Session = Depends(get_db)):
         )
 
     # Look up all requested documents
-    docs = db.query(DocumentCatalog).filter(DocumentCatalog.id.in_(req.doc_ids)).all()
+    docs = db.query(DocumentCatalog).filter(
+        DocumentCatalog.id.in_(req.doc_ids),
+        DocumentCatalog.user_id == user["id"],
+    ).all()
 
     if not docs:
         raise HTTPException(status_code=404, detail="No documents found for the given IDs.")

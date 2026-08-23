@@ -9,11 +9,11 @@ import { ChartRenderer } from './ChartRenderer'
 interface Props {
   messages: Message[]
   isLoading: boolean
-  multiDocIds: number[]
-  catalogDocId: number | null
+  docCount: number
+  chatWithDocs: boolean
 }
 
-export function ChatMessages({ messages, isLoading, multiDocIds, catalogDocId }: Props) {
+export function ChatMessages({ messages, isLoading, docCount, chatWithDocs }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -28,9 +28,12 @@ export function ChatMessages({ messages, isLoading, multiDocIds, catalogDocId }:
         </div>
         <h2 className="text-xl font-semibold mb-2">Enterprise Q</h2>
         <p className="text-muted-foreground text-sm max-w-md">
-          Upload a data file or PDF, select a query mode, and start asking questions.
-          {multiDocIds.length > 0 && ` Querying ${multiDocIds.length} documents.`}
-          {catalogDocId && ` Using catalog document #${catalogDocId}.`}
+          Upload files or add documents from your catalog, then start asking questions.
+          {chatWithDocs && docCount > 0
+            ? ` Chatting with ${docCount} selected document${docCount > 1 ? 's' : ''}.`
+            : docCount > 0
+            ? ` ${docCount} document${docCount > 1 ? 's' : ''} ready — use "Chat with documents" above to query them.`
+            : ''}
         </p>
         <div className="grid grid-cols-2 gap-3 mt-6 max-w-sm w-full">
           {[

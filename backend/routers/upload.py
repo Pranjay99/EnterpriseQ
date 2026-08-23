@@ -12,6 +12,7 @@ import json
 import os
 import shutil
 import tempfile
+import uuid
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -19,11 +20,13 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage
 
+from auth import get_current_user
+from fastapi import Depends
 from models.schemas import UploadResponse
 from models.database import SessionLocal, DocumentCatalog
 from pipelines.csv_loader import load_csv, load_excel
 from pipelines.json_loader import load_json
-from pipelines.sql_loader import df_to_sqlite
+from pipelines.sql_loader import add_df_to_sqlite, filename_to_table
 from pipelines.pdf_loader import load_pdf
 from utils.vector_store import ingest_chunks, ingest_chunks_permanent, clear_vectorstore
 from utils.prompt_templates import DOCUMENT_SUMMARIZE_PROMPT
@@ -49,8 +52,154 @@ _dataframes: dict[str, pd.DataFrame] = {}
 _databases: dict[str, object] = {}
 
 
+# Directory where cataloged data files are snapshotted (as CSV) so they can
+# be reloaded into future sessions.
+_CATALOG_FILES_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "catalog_files")
+)
+
+
+def _file_type_from_name(filename: str) -> str:
+    suffix = os.path.splitext(filename)[1].lower()
+    return {".csv": "csv", ".xlsx": "excel", ".xls": "excel", ".json": "json"}.get(suffix, "data")
+
+
+def catalog_data_document(df: pd.DataFrame, filename: str, user_id: str) -> dict:
+    """
+    Add a tabular file to the permanent catalog: auto-summarize its schema and
+    sample rows with Gemini, store metadata + a CSV snapshot on disk so the
+    data can be reloaded into any future session.
+
+    Returns: {doc_id, category, tags, summary, rows, columns, column_types}
+    """
+    profile_lines = [
+        f"Tabular data file: {filename}",
+        f"Shape: {df.shape[0]} rows x {df.shape[1]} columns",
+        f"Columns and types: { {str(c): str(t) for c, t in df.dtypes.items()} }",
+        "",
+        "Sample rows:",
+        df.head(5).to_markdown(index=False),
+    ]
+    summary_text = ""
+    category = "Uncategorized"
+    tags: list = []
+    try:
+        prompt = DOCUMENT_SUMMARIZE_PROMPT.format(document_text="\n".join(profile_lines)[:3000])
+        resp = _summarize_llm.invoke([HumanMessage(content=prompt)])
+        parsed = json.loads(resp.content)
+        summary_text = parsed.get("summary", "")
+        category = parsed.get("category", "Uncategorized")
+        tags = parsed.get("tags", [])
+    except Exception:
+        summary_text = f"Data file: {filename} ({df.shape[0]} rows, {df.shape[1]} columns)"
+
+    db = SessionLocal()
+    try:
+        doc_row = DocumentCatalog(
+            user_id=user_id,
+            filename=filename,
+            file_type=_file_type_from_name(filename),
+            category=category,
+            tags=tags,
+            summary=summary_text,
+            # Data files are not embedded — unique placeholder satisfies the constraint
+            vector_collection=f"data_{uuid.uuid4().hex}",
+        )
+        db.add(doc_row)
+        db.commit()
+        db.refresh(doc_row)
+
+        os.makedirs(_CATALOG_FILES_DIR, exist_ok=True)
+        snapshot_path = os.path.join(_CATALOG_FILES_DIR, f"doc_{doc_row.id}.csv")
+        df.to_csv(snapshot_path, index=False)
+        doc_row.file_path = snapshot_path
+        db.commit()
+        doc_id = doc_row.id
+    finally:
+        db.close()
+
+    return {
+        "doc_id": doc_id,
+        "category": category,
+        "tags": tags,
+        "summary": summary_text,
+        "rows": len(df),
+        "columns": list(df.columns),
+        "column_types": {str(c): _friendly_dtype(t) for c, t in df.dtypes.items()},
+    }
+
+
+def catalog_pdf_document(chunks: list[str], filename: str, user_id: str) -> dict:
+    """
+    Add a parsed PDF to the permanent catalog: auto-summarize with Gemini,
+    create the DocumentCatalog row, and embed into a permanent ChromaDB
+    collection. Shared by session uploads and direct catalog uploads.
+
+    Returns: {doc_id, num_chunks, category, tags, summary}
+    """
+    snippet = "\n".join(chunks)[:3000]
+    summary_text = ""
+    category = "Uncategorized"
+    tags: list = []
+    try:
+        prompt = DOCUMENT_SUMMARIZE_PROMPT.format(document_text=snippet)
+        resp = _summarize_llm.invoke([HumanMessage(content=prompt)])
+        parsed = json.loads(resp.content)
+        summary_text = parsed.get("summary", "")
+        category = parsed.get("category", "Uncategorized")
+        tags = parsed.get("tags", [])
+    except Exception:
+        summary_text = f"Document: {filename}"
+
+    db = SessionLocal()
+    try:
+        doc_row = DocumentCatalog(
+            user_id=user_id,
+            filename=filename,
+            file_type="pdf",
+            category=category,
+            tags=tags,
+            summary=summary_text,
+            vector_collection="",  # placeholder, updated below
+        )
+        db.add(doc_row)
+        db.commit()
+        db.refresh(doc_row)
+
+        num_chunks, collection_name = ingest_chunks_permanent(
+            doc_row.id, chunks, filename
+        )
+        doc_row.vector_collection = collection_name
+        db.commit()
+        doc_id = doc_row.id
+    finally:
+        db.close()
+
+    return {
+        "doc_id": doc_id,
+        "num_chunks": num_chunks,
+        "category": category,
+        "tags": tags,
+        "summary": summary_text,
+    }
+
+
+def _friendly_dtype(dtype) -> str:
+    """Map a pandas dtype to a user-facing label for the frontend."""
+    kind = getattr(dtype, "kind", "O")
+    return {
+        "i": "number", "u": "number", "f": "number",
+        "b": "boolean",
+        "M": "datetime", "m": "duration",
+    }.get(kind, "text")
+
+
 @router.post("/upload/{session_id}", response_model=UploadResponse)
-def upload_file(session_id: str, file: UploadFile = File(...)):
+def upload_file(
+    session_id: str,
+    file: UploadFile = File(...),
+    user: dict = Depends(get_current_user),
+):
     """
     Upload a data file for a session.
 
@@ -93,57 +242,21 @@ def upload_file(session_id: str, file: UploadFile = File(...)):
             # Also ingest into session-scoped collection for immediate chat
             ingest_chunks(session_id, chunks, filename)
 
-            # ── Catalog: auto-summarize with Gemini ──────────────────
-            full_text = "\n".join(chunks)
-            snippet = full_text[:3000]
-            summary_text = ""
-            category = "Uncategorized"
-            tags = []
-            try:
-                prompt = DOCUMENT_SUMMARIZE_PROMPT.format(document_text=snippet)
-                resp = _summarize_llm.invoke([HumanMessage(content=prompt)])
-                parsed = json.loads(resp.content)
-                summary_text = parsed.get("summary", "")
-                category = parsed.get("category", "Uncategorized")
-                tags = parsed.get("tags", [])
-            except Exception:
-                summary_text = f"Document: {filename}"
-
-            # ── Catalog: create DB row first to get the id ───────────
-            db = SessionLocal()
-            try:
-                doc_row = DocumentCatalog(
-                    filename=filename,
-                    file_type="pdf",
-                    category=category,
-                    tags=tags,
-                    summary=summary_text,
-                    vector_collection="",  # placeholder, updated below
-                )
-                db.add(doc_row)
-                db.commit()
-                db.refresh(doc_row)
-
-                # ── Catalog: ingest into permanent collection ────────
-                num_chunks, collection_name = ingest_chunks_permanent(
-                    doc_row.id, chunks, filename
-                )
-                doc_row.vector_collection = collection_name
-                db.commit()
-
-                # Capture values before closing session
-                saved_doc_id = doc_row.id
-            finally:
-                db.close()
+            # Add to the permanent catalog (summary, category, tags, embeddings)
+            meta = catalog_pdf_document(chunks, filename, user["id"])
 
             os.unlink(tmp_path)
             return UploadResponse(
                 filename=filename,
-                chunks=num_chunks,
+                chunks=meta["num_chunks"],
+                size_mb=round(size / (1024 * 1024), 2),
                 file_type="document",
-                doc_id=saved_doc_id,
-                message=f"Successfully ingested {num_chunks} chunks from '{filename}' "
-                        f"into catalog (category: {category}).",
+                doc_id=meta["doc_id"],
+                category=meta["category"],
+                tags=meta["tags"],
+                summary=meta["summary"],
+                message=f"Successfully ingested {meta['num_chunks']} chunks from '{filename}' "
+                        f"into catalog (category: {meta['category']}).",
             )
 
         if suffix == ".csv":
@@ -158,15 +271,22 @@ def upload_file(session_id: str, file: UploadFile = File(...)):
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
 
+    # Latest data file is the active DataFrame (DataFrame mode + charts);
+    # every data file also becomes its own SQL table so queries can join files.
+    table_name = filename_to_table(filename)
     _dataframes[session_id] = df
-    _databases[session_id] = df_to_sqlite(df, table_name="uploaded_data")
+    _databases[session_id] = add_df_to_sqlite(_databases.get(session_id), df, table_name)
 
     return UploadResponse(
         filename=filename,
         rows=len(df),
         columns=list(df.columns),
+        column_types={str(c): _friendly_dtype(t) for c, t in df.dtypes.items()},
+        size_mb=round(size / (1024 * 1024), 2),
         file_type="data",
-        message=f"Successfully loaded {len(df):,} rows and {len(df.columns)} columns.",
+        table_name=table_name,
+        message=f"Successfully loaded {len(df):,} rows and {len(df.columns)} columns "
+                f"into table '{table_name}'.",
     )
 
 

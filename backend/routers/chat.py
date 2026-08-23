@@ -11,7 +11,9 @@ POST /api/chat
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+
+from auth import get_current_user
 
 from agents.data_agent import query_data
 from agents.sql_agent import query_sql
@@ -30,7 +32,7 @@ router = APIRouter()
 
 
 @router.post("/chat", response_model=ChatResponse)
-def chat(req: ChatRequest):
+def chat(req: ChatRequest, user: dict = Depends(get_current_user)):
     """
     Ask a natural-language question about the data loaded for a session,
     or about a cataloged document (via doc_id).
@@ -43,7 +45,8 @@ def chat(req: ChatRequest):
         db = SessionLocal()
         try:
             docs = db.query(DocumentCatalog).filter(
-                DocumentCatalog.id.in_(req.doc_ids)
+                DocumentCatalog.id.in_(req.doc_ids),
+                DocumentCatalog.user_id == user["id"],
             ).all()
             if not docs:
                 raise HTTPException(status_code=404, detail="No catalog documents found for given IDs.")
@@ -77,7 +80,10 @@ def chat(req: ChatRequest):
     if req.doc_id is not None:
         db = SessionLocal()
         try:
-            doc = db.query(DocumentCatalog).filter(DocumentCatalog.id == req.doc_id).first()
+            doc = db.query(DocumentCatalog).filter(
+                DocumentCatalog.id == req.doc_id,
+                DocumentCatalog.user_id == user["id"],
+            ).first()
             if not doc:
                 raise HTTPException(status_code=404, detail="Catalog document not found.")
 
