@@ -14,6 +14,8 @@ __pycache__/
 # Runtime data (not part of source)
 catalog.db
 chroma_data/
+catalog_files/
+.pytest_cache/
 
 # Secrets
 .env

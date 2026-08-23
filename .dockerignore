@@ -1,0 +1,21 @@
+# Never bake local state, secrets, or frontend into the backend image
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+.venv
+chat_env
+frontend
+node_modules
+chroma_data
+catalog_files
+catalog.db
+sample_data
+finetuning
+docs
+tests
+.pytest_cache
+__pycache__
+**/__pycache__
+*.pyc
